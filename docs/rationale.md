@@ -38,6 +38,7 @@
 | 紅黑**點對稱**（而非軸對稱） | 黑方＝紅方旋轉 180°：**從各自座位看，雙方陣形一模一樣**（紅「一路」兵進 ↔ 黑「1路」卒進）。這是棋手視角最自然的「公平相同」；標準象棋開局本身同時滿足點對稱與軸對稱，故標準局仍在池內 |
 | 象限「原軌道」、兵僅進一格 | 「預走合法步」原則：起始位置都是原規則可達的點，棋味與殘局知識完整保留 |
 | 將帥仍固定中路 | 中路自對稱、最簡；將位隨機在點對稱架構下已可行，列為 v4 研究 |
+| **不**做「紅黑完全不對稱」 | 公平性會從「可證明」退化為「只能逐局實測」；池規模爆到 10¹¹ 量級使編號與引擎審局失效。詳見 [spec.md §10](spec.md)（已否決方向） |
 
 命名：按 Chess960 以局面數命名的慣例可稱「象棋339484」；因數字太長，主名採**隨機開局象棋**，代號 **cc960**。
 
@@ -59,6 +60,21 @@ Chess960 的教訓：引擎評估 960 個局面**全數利白**，平均 +0.33 �
 1. **同輪同局面**：比賽同一輪全場用同一開局，把不均攤到所有人。
 2. **雙局換色**：對抗賽同一局面各執紅一次。
 3. **引擎審局池**（待辦）：用 Pikafish 類引擎評估合法局面，把賽用池縮到接近平衡的子集。
+
+### 建議賽制（定案 2026-07-25）
+
+西洋棋現行做法：FIDE World Fischer Random 2019／2022 的小組賽與淘汰賽都是**同一局面連下兩局、雙方換色**[^14]；Grenke Freestyle Open 2025 是**每輪抽一局、全場同用、抽過不重複**[^15]；Freestyle Grand Slam **開賽前 15 分鐘才公布局面**以封殺賽前準備[^13]。**沒有主流賽事採用 ban／veto 制。**
+
+| 場景 | 做法 |
+|------|------|
+| 對抗賽（能下兩局） | **同局面雙局換色**。最便宜、已被實戰驗證，直接對消先手優勢 |
+| 單局賽事 | **抽 3 局 → A 選局面 → B 選邊**（切蛋糕原理：A 有動機選最平衡的，否則 B 把好的一邊挑走） |
+| 共同配套 | 賽用池採輕量版（密集編號 #1–#216）；開賽前 15 分鐘公布局面 |
+
+**為何不用「雙方各否決一局」的 ban 制**：ban 制不解決先手優勢（它只決定下哪個局面，不決定誰先走），且雙方各刪掉自己最不喜歡的之後，剩下的是「兩人都不討厭」的局面——天然趨向平衡、保守、結構端正，**與壓低和棋率的目標相反**。
+（另一項疑慮「能選局＝賽前準備回流」在完整池下不成立：33,236 局以上的池子抽 3 局，不可能事先針對特定局面備戰。但若賽用池縮到 216 局，備戰就重新變得可行——這是採用小賽用池必須連帶接受的成本，緩解手段是賽前 15 分鐘才公布。）
+
+**選局／選邊優於引擎審局的一點**：它的公平性是機制保證的，不依賴引擎評估是否可靠。象棋引擎（NNUE）對非標準開局屬訓練分布外，Pikafish 跑分因此定位為**事後驗證**（畫分布、找極端尾巴），不作為賽制公平性的前提。
 
 ## 六、與揭棋的差異（常見誤解）
 
@@ -93,3 +109,5 @@ Chess960 的教訓：引擎評估 960 個局面**全數利白**，平均 +0.33 �
 [^11]: Chess Variant Pages 象棋變體列表 <https://www.chessvariants.com/xiangqivars.php>；List of Xiangqi variants <https://en.wikipedia.org/wiki/List_of_Xiangqi_variants>
 [^12]: Barthelemy, arXiv:2512.14319（Chess960 全局面引擎評估） <https://arxiv.org/abs/2512.14319>；chess.com 分析 <https://www.chess.com/article/view/whats-the-most-unbalanced-chess960-position>
 [^13]: ChessBase《Arbiting a Freestyle event》 <https://en.chessbase.com/post/arbiting-a-freestyle-event>；維基百科 Chess960 <https://en.wikipedia.org/wiki/Chess960>
+[^14]: 維基百科 FIDE World Fischer Random Chess Championship 2019 <https://en.wikipedia.org/wiki/FIDE_World_Fischer_Random_Chess_Championship_2019>、2022 <https://en.wikipedia.org/wiki/FIDE_World_Fischer_Random_Chess_Championship_2022>
+[^15]: 維基百科 Grenke Freestyle Chess Open <https://en.wikipedia.org/wiki/Grenke_Freestyle_Chess_Open>；FIDE Rules Commission, Guidelines II. Chess960 Rules <http://rcc.fide.com/guidelinesii/>

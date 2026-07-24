@@ -32,16 +32,18 @@ const S = require('../src/setup.js');
 console.log('[枚舉] 編號空間 RAW_TOTAL =', S.RAW_TOTAL);
 const t0 = Date.now();
 const stats = { structural: 0, facing: 0, check: 0, 'free-capture': 0, 'winning-capture': 0 };
-let valid = 0, liteValid = 0;
+let valid = 0, liteValid = 0, pawnFixedValid = 0;
 const liteSet = new Set(S.liteCandidates());
 for (let id = 0; id < S.RAW_TOTAL; id++) {
   const res = S.checkId(id);
-  if (res.ok) { valid++; if (liteSet.has(id)) liteValid++; }
+  // 兵遮罩是編號最低 5 bit（各象位組大小皆為 32 的倍數），故 id % 32 === 0 ⇔ 兵全原位
+  if (res.ok) { valid++; if (liteSet.has(id)) liteValid++; if (id % 32 === 0) pawnFixedValid++; }
   else stats[res.why]++;
   if (id % 200000 === 199999) console.log('  …', id + 1, '/', S.RAW_TOTAL, 'valid so far', valid, ((Date.now() - t0) / 1000).toFixed(0) + 's');
 }
 console.log('[結果] 合法局面數 =', valid, '(預期 339484)');
 console.log('[結果] 淘汰統計 =', JSON.stringify(stats));
+console.log('[結果] 兵全原位子集合法 =', pawnFixedValid, '/', S.RAW_TOTAL / 32, '(預期 33236 / 43416)');
 console.log('[結果] 輕量版(216 候選)合法 =', liteValid, '(預期 216)');
 console.log('[結果] 軸對稱版合法 =', S.symCandidates().filter(id => S.checkId(id).ok).length, '(預期 146)');
 console.log('[結果] 耗時 =', ((Date.now() - t0) / 1000).toFixed(1), 's');
