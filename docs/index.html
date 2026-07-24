@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="cc960：借鑑 Chess960 的隨機開局中國象棋，走法不變、只隨機開局擺放，合法開局 339,484 種。">
+<title>cc960 — 隨機開局象棋</title>
+<style>
+  :root {
+    --paper: #faf6ee;        /* 暖紙色底 */
+    --ink: #2b2118;          /* 墨色文字 */
+    --ink-muted: #7a6a58;
+    --board: #e9cf9b;        /* 棋盤木色 */
+    --board-line: #6b5233;   /* 盤線 */
+    --board-edge: #8a6a40;
+    --piece-face: #f7eed9;   /* 棋子牙白 */
+    --piece-rim: #c9b48d;
+    --red: #b03a2e;          /* 朱紅（紅方） */
+    --black-piece: #26201a;  /* 黑方墨字 */
+    --accent: #35507a;       /* 靛青（UI 互動色，避開棋子紅） */
+    --accent-soft: #dfe7f2;
+    --panel: #f2ebdd;
+    --panel-border: #d9cbb2;
+    --good: #2c6e49;
+    --warn: #a63c06;
+    --hint: rgba(53, 80, 122, .55);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #17120d; --ink: #e8ddcc; --ink-muted: #a08e77;
+      --board: #43331f; --board-line: #c4a771; --board-edge: #2c2113;
+      --piece-face: #efe3c8; --piece-rim: #8a744f;
+      --red: #e05a4b; --black-piece: #211a12;
+      --accent: #8fb0dd; --accent-soft: #26344a;
+      --panel: #201810; --panel-border: #3d3020;
+      --good: #7cc29a; --warn: #f0946a;
+      --hint: rgba(143, 176, 221, .6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #17120d; --ink: #e8ddcc; --ink-muted: #a08e77;
+    --board: #43331f; --board-line: #c4a771; --board-edge: #2c2113;
+    --piece-face: #efe3c8; --piece-rim: #8a744f;
+    --red: #e05a4b; --black-piece: #211a12;
+    --accent: #8fb0dd; --accent-soft: #26344a;
+    --panel: #201810; --panel-border: #3d3020;
+    --good: #7cc29a; --warn: #f0946a;
+    --hint: rgba(143, 176, 221, .6);
+  }
+  :root[data-theme="light"] {
+    --paper: #faf6ee; --ink: #2b2118; --ink-muted: #7a6a58;
+    --board: #e9cf9b; --board-line: #6b5233; --board-edge: #8a6a40;
+    --piece-face: #f7eed9; --piece-rim: #c9b48d;
+    --red: #b03a2e; --black-piece: #26201a;
+    --accent: #35507a; --accent-soft: #dfe7f2;
+    --panel: #f2ebdd; --panel-border: #d9cbb2;
+    --good: #2c6e49; --warn: #a63c06;
+    --hint: rgba(53, 80, 122, .55);
+  }
+  body { background: var(--paper); color: var(--ink);
+         font-family: "Segoe UI", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+         margin: 0; line-height: 1.6; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 20px 16px 60px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 16px;
+           border-bottom: 2px solid var(--panel-border); padding-bottom: 12px; margin-bottom: 18px; }
+  h1 { font-family: "Source Han Serif TC", "Noto Serif TC", "PMingLiU", serif;
+       font-size: 1.7rem; margin: 0; letter-spacing: .06em; }
+  h1 .num { color: var(--red); }
+  .tagline { color: var(--ink-muted); font-size: .92rem; }
+  a { color: var(--accent); }
+  .layout { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  .board-col { flex: 0 1 520px; min-width: 300px; }
+  .side-col { flex: 1 1 320px; min-width: 280px; display: flex; flex-direction: column; gap: 14px; }
+  svg { width: 100%; height: auto; display: block; border-radius: 6px;
+        box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+  .panel { background: var(--panel); border: 1px solid var(--panel-border);
+           border-radius: 8px; padding: 14px 16px; }
+  .panel h2 { font-size: .8rem; letter-spacing: .18em; text-transform: uppercase;
+              color: var(--ink-muted); margin: 0 0 10px; font-weight: 600; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button { font: inherit; font-size: .92rem; padding: 7px 14px; border-radius: 6px;
+           border: 1px solid var(--panel-border); background: var(--paper); color: var(--ink);
+           cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--paper); font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; }
+  select, input[type="number"] { font: inherit; font-size: .92rem; padding: 6px 8px;
+    border-radius: 6px; border: 1px solid var(--panel-border); background: var(--paper); color: var(--ink); }
+  input[type="number"] { width: 120px; font-variant-numeric: tabular-nums; }
+  .posinfo { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .92rem; margin-top: 10px;
+             font-variant-numeric: tabular-nums; }
+  .posinfo b { color: var(--accent); }
+  .gen-note { font-size: .85rem; color: var(--warn); min-height: 1.4em; margin-top: 4px; }
+  .status { font-size: 1.02rem; min-height: 1.6em; }
+  .status .turn-red { color: var(--red); font-weight: 700; }
+  .status .turn-black { font-weight: 700; }
+  .status .check { color: var(--warn); font-weight: 700; margin-left: 8px; }
+  .status .over { color: var(--good); font-weight: 700; }
+  .movelist { max-height: 300px; overflow-y: auto; font-size: .88rem;
+              font-variant-numeric: tabular-nums; }
+  .movelist ol { margin: 0; padding-left: 2em; }
+  .movelist li { padding: 1px 0; }
+  .movelist .red-mv { color: var(--red); }
+  details { font-size: .9rem; }
+  details summary { cursor: pointer; font-weight: 600; }
+  details ul { padding-left: 1.3em; margin: 8px 0; }
+  details li { margin: 4px 0; }
+  .muted { color: var(--ink-muted); }
+  footer { margin-top: 28px; color: var(--ink-muted); font-size: .85rem;
+           border-top: 1px solid var(--panel-border); padding-top: 10px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .piece { transition: transform .15s ease; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>cc960 <span class="num">隨機開局象棋</span></h1>
+    <span class="tagline">借鑑 Chess960 的中國象棋：走法完全不變，只隨機開局擺放 — 合法開局 <b>339,484</b> 種（規格 v3・紅黑點對稱）</span>
+  </header>
+
+  <div class="layout">
+    <div class="board-col">
+      <svg id="board" viewBox="0 0 500 554" role="img" aria-label="象棋棋盤"></svg>
+    </div>
+
+    <div class="side-col">
+      <div class="panel">
+        <h2>開局產生器</h2>
+        <div class="controls">
+          <select id="mode" aria-label="版本">
+            <option value="full">完整版（合法開局 339,484 種）</option>
+            <option value="sym">軸對稱版（146 局・每方自身左右對稱）</option>
+            <option value="lite">輕量版（216 局・象兵固定，只隨機車馬炮）</option>
+          </select>
+          <button class="primary" id="btn-random">🎲 隨機一局</button>
+          <button id="btn-standard">標準開局</button>
+        </div>
+        <div class="controls" style="margin-top:8px">
+          <label for="posid">編號</label>
+          <input type="number" id="posid" min="0" value="0">
+          <button id="btn-goto">跳轉</button>
+        </div>
+        <div class="posinfo">
+          <span id="info-id-wrap">編號 <b id="info-id">–</b></span>
+          <span>紅方首著機動力 <b id="info-mob">–</b></span>
+        </div>
+        <div class="gen-note" id="gen-note"></div>
+      </div>
+
+      <div class="panel">
+        <h2>對局</h2>
+        <div class="status" id="status"></div>
+        <div class="controls" style="margin:8px 0">
+          <button id="btn-undo">悔棋</button>
+          <button id="btn-reset">重下此局</button>
+        </div>
+        <div class="movelist" id="movelist"><ol id="moves"></ol></div>
+      </div>
+
+      <div class="panel">
+        <details>
+          <summary>規則（規格 v3・紅黑點對稱）</summary>
+          <ul>
+            <li><b>走法與勝負完全同標準象棋</b>，只有初始擺放不同。</li>
+            <li><b>紅黑點對稱</b>（旋轉 180°）：黑方擺法＝紅方轉半圈——紅「一路」兵前進，對應黑「1路」卒前進（各自從自己座位數），<b>從各自座位看，雙方陣形一模一樣</b>。</li>
+            <li>將帥居中路九宮底、雙士貼於兩側（中路自對稱，且必有兵卒相隔，永不照面）。</li>
+            <li><b>象 2 子</b>隨機置於「原軌道」7 點中任 2 點（底線 c/g、宮頂線 a/e/i、河沿 c/g）——如同開局前已在己方領土走過合法步；空出的底線位留空。</li>
+            <li><b>馬 2 子、車 2 子</b>隨機分配剩餘的底線非九宮路；<b>炮 2 子</b>隨機置於宮頂線任 2 路（不可疊上象）。</li>
+            <li><b>兵 5 子</b>各路獨立：原位或前進一格（不可疊上河沿象）。</li>
+            <li>「首著靜置檢定」剔除失衡開局：任一首著吃子須<b>有根且不虧</b>，或<b>對稱可回應</b>（吃完後對方仍能走點對稱的對應著吃回同型子），否則局面不合法。</li>
+            <li>編號空間 1,389,312，其中合法 <b>339,484</b> 種（含標準開局＝編號 3872）。輕量版＝象、兵固定只隨機車馬炮，<b>216 局全數合法</b>（標準開局＝其 #122）。</li>
+            <li><b>軸對稱版</b>（衍生版本）：加一條限制——每方自身以中線左右對稱（此時黑方旋轉與翻面結果相同，棋形如標準棋端正），合法開局 <b>146</b> 局（標準開局＝其 #21）。</li>
+            <li class="muted">本演示未實作長打（長將、長捉）禁著判例；棋規判例依中國象棋競賽規則。</li>
+          </ul>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    cc960 · 隨機開局象棋（規格 v3）· 走法引擎與局面檢定皆於本頁即時計算，無後端、無外部函式庫 ·
+    原始碼與完整規格：<a href="https://github.com/Hero0963/cc960">github.com/Hero0963/cc960</a> · MIT License
+  </footer>
+</div>
+
+<script>
+// cc960 — 象棋走法引擎（Node 驗算與瀏覽器演示共用）
+//
+// 這一層只負責「標準中國象棋的行棋規則」，與隨機開局完全無關：
+// 換句話說，把 setup.js 拿掉、改用標準開局擺法，這個檔案就是一副普通象棋。
+//
+// 座標：col 0..8（紅方視角左→右，對應 a..i），row 0..9（row 0 = 紅方底線，row 9 = 黑方底線）
+// 棋子：{ t: 'K|A|B|N|R|C|P', c: 0 紅 | 1 黑 }
+//   K 將帥　A 士仕　B 象相　N 馬傌　R 車俥　C 炮包　P 兵卒
+
+const RED = 0, BLACK = 1;
+
+// 子力價值（僅供開局檢定的「虧不虧」比較，不是引擎評估值）
+const VAL = { R: 9, C: 4.5, N: 4, B: 2, A: 2, P: 1, K: 1000 };
+
+function emptyBoard() {
+  return Array.from({ length: 10 }, () => Array(9).fill(null));
+}
+
+function inBoard(r, c) { return r >= 0 && r <= 9 && c >= 0 && c <= 8; }
+
+function inPalace(r, c, color) {
+  if (c < 3 || c > 5) return false;
+  return color === RED ? (r >= 0 && r <= 2) : (r >= 7 && r <= 9);
+}
+
+function ownSide(r, color) { return color === RED ? r <= 4 : r >= 5; }
+
+function findKing(bd, color) {
+  for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) {
+    const p = bd[r][c];
+    if (p && p.t === 'K' && p.c === color) return [r, c];
+  }
+  return null;
+}
+
+// 產生 (r,c) 上棋子的偽合法走法（不含自將檢查）
+function pseudoMoves(bd, r, c) {
+  const p = bd[r][c];
+  if (!p) return [];
+  const mv = [];
+  const push = (rr, cc) => {
+    if (!inBoard(rr, cc)) return false;
+    const q = bd[rr][cc];
+    if (!q) { mv.push([rr, cc]); return true; }      // 空點可走、可續行
+    if (q.c !== p.c) mv.push([rr, cc]);              // 敵子可吃
+    return false;                                     // 有子擋路
+  };
+  const ORTH = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  if (p.t === 'K') {
+    for (const [dr, dc] of ORTH) {
+      const rr = r + dr, cc = c + dc;
+      if (inPalace(rr, cc, p.c)) push(rr, cc);
+    }
+  } else if (p.t === 'A') {
+    for (const dr of [-1, 1]) for (const dc of [-1, 1]) {
+      const rr = r + dr, cc = c + dc;
+      if (inPalace(rr, cc, p.c)) push(rr, cc);
+    }
+  } else if (p.t === 'B') {
+    for (const dr of [-2, 2]) for (const dc of [-2, 2]) {
+      const rr = r + dr, cc = c + dc;
+      if (!inBoard(rr, cc) || !ownSide(rr, p.c)) continue;      // 不過河
+      if (bd[r + dr / 2][c + dc / 2]) continue;                 // 塞象眼
+      push(rr, cc);
+    }
+  } else if (p.t === 'N') {
+    const J = [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
+    for (const [dr, dc] of J) {
+      const rr = r + dr, cc = c + dc;
+      if (!inBoard(rr, cc)) continue;
+      const lr = r + (Math.abs(dr) === 2 ? dr / 2 : 0);
+      const lc = c + (Math.abs(dc) === 2 ? dc / 2 : 0);
+      if (bd[lr][lc]) continue;                                 // 蹩馬腿
+      push(rr, cc);
+    }
+  } else if (p.t === 'R') {
+    for (const [dr, dc] of ORTH) {
+      let rr = r + dr, cc = c + dc;
+      while (inBoard(rr, cc) && push(rr, cc)) { rr += dr; cc += dc; }
+    }
+  } else if (p.t === 'C') {
+    for (const [dr, dc] of ORTH) {
+      let rr = r + dr, cc = c + dc, jumped = false;
+      while (inBoard(rr, cc)) {
+        const q = bd[rr][cc];
+        if (!jumped) {
+          if (!q) mv.push([rr, cc]);
+          else jumped = true;                                   // 遇到砲架
+        } else if (q) {
+          if (q.c !== p.c) mv.push([rr, cc]);                   // 隔子吃
+          break;
+        }
+        rr += dr; cc += dc;
+      }
+    }
+  } else if (p.t === 'P') {
+    const f = p.c === RED ? 1 : -1;
+    push(r + f, c);
+    if (!ownSide(r, p.c)) { push(r, c - 1); push(r, c + 1); }   // 過河後可橫走
+  }
+  return mv;
+}
+
+// color 方是否攻擊 (tr,tc)（不含照面規則）
+function isAttacked(bd, tr, tc, color) {
+  for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) {
+    const p = bd[r][c];
+    if (!p || p.c !== color) continue;
+    for (const [rr, cc] of pseudoMoves(bd, r, c)) {
+      if (rr === tr && cc === tc) return true;
+    }
+  }
+  return false;
+}
+
+// 將帥是否照面（同路且中間無隔子）
+function kingsFacing(bd) {
+  const rk = findKing(bd, RED), bk = findKing(bd, BLACK);
+  if (!rk || !bk || rk[1] !== bk[1]) return false;
+  for (let r = rk[0] + 1; r < bk[0]; r++) if (bd[r][rk[1]]) return false;
+  return true;
+}
+
+function inCheck(bd, color) {
+  const k = findKing(bd, color);
+  if (!k) return true;
+  return isAttacked(bd, k[0], k[1], 1 - color) || kingsFacing(bd);
+}
+
+function makeMove(bd, r, c, rr, cc) {
+  const nb = bd.map(row => row.slice());
+  nb[rr][cc] = nb[r][c];
+  nb[r][c] = null;
+  return nb;
+}
+
+// color 方所有合法走法（排除自將、照面）
+function legalMoves(bd, color) {
+  const out = [];
+  for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) {
+    const p = bd[r][c];
+    if (!p || p.c !== color) continue;
+    for (const [rr, cc] of pseudoMoves(bd, r, c)) {
+      const nb = makeMove(bd, r, c, rr, cc);
+      if (!inCheck(nb, color)) out.push([r, c, rr, cc]);
+    }
+  }
+  return out;
+}
+
+// ---------- 組合工具（setup.js 的編號系統會用到） ----------
+
+// arr 中所有「取 2 個」的組合，字典序
+function pairs(arr) {
+  const out = [];
+  for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) out.push([arr[i], arr[j]]);
+  return out;
+}
+
+const C_PAIRS = pairs([0, 1, 2, 3, 4, 5, 6, 7, 8]);   // 炮的 36 種路組合
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    RED, BLACK, VAL,
+    emptyBoard, inBoard, inPalace, ownSide, findKing,
+    pseudoMoves, isAttacked, kingsFacing, inCheck, makeMove, legalMoves,
+    pairs, C_PAIRS,
+  };
+}
+
+</script>
+<script>
+// cc960 — 隨機開局擺位產生器（規格 v3）
+//
+// 三條結構規則：
+//   一、紅黑「點對稱」：黑方 = 紅方旋轉 180°（紅 (r,c) ↔ 黑 (9-r, 8-c)）。
+//       從各自座位看，雙方陣形一模一樣（紅「一路」兵進 ↔ 黑「1路」卒進，不是同一 column）。
+//   二、象限定「原軌道」7 點（等同開局前已在己方領土走過合法步可達的點）。
+//   三、兵各路獨立，可原位或前進一格（每方 2^5 = 32 種兵形）。
+// 檢定（quietStartCheck）：任一首著吃子須「有根且不虧」或「對稱可回應」。
+//
+// 依賴 rules.js 的走法引擎：Node 用 require 注入全域；瀏覽器中兩份 <script> 本就共享全域詞法環境。
+// 完整規格與推導見 docs/spec.md。
+
+if (typeof module !== 'undefined' && typeof RED === 'undefined') {
+  Object.assign(globalThis, require('./rules.js'));
+}
+
+// 紅方象的原軌道 7 點 [row, col]：c1,g1（底線）、a3,e3,i3（宮頂線）、c5,g5（河沿）
+const E_POINTS = [[0, 2], [0, 6], [2, 0], [2, 4], [2, 8], [4, 2], [4, 6]];
+const E_PAIRS = [];
+for (let i = 0; i < 7; i++) for (let j = i + 1; j < 7; j++) E_PAIRS.push([i, j]);
+const BACK_ALL = [0, 1, 2, 6, 7, 8];   // 底線非九宮路 a,b,c,g,h,i
+const PAWN_FILES = [0, 2, 4, 6, 8];    // 兵的 5 路 a,c,e,g,i
+
+// 依象位分組的混合基數編號：每組大小 = C(m,2) 馬 × C(m-2,2) 車 × 36 炮 × 32 兵形
+// （m = 扣掉底線象位後、底線還剩幾路可放車馬）
+const GROUPS = E_PAIRS.map(([i, j]) => {
+  const pts = [E_POINTS[i], E_POINTS[j]];
+  const backOcc = pts.filter(p => p[0] === 0).map(p => p[1]);
+  const backAvail = BACK_ALL.filter(f => !backOcc.includes(f));
+  const hPairs = pairs(backAvail);
+  const m = backAvail.length;
+  const rBase = (m - 2) * (m - 3) / 2;
+  return { pts, backAvail, hPairs, rBase, hrBase: hPairs.length * rBase, size: hPairs.length * rBase * 36 * 32 };
+});
+const OFFSETS = [];
+{ let acc = 0; for (const g of GROUPS) { OFFSETS.push(acc); acc += g.size; } }
+const RAW_TOTAL = OFFSETS[OFFSETS.length - 1] + GROUPS[GROUPS.length - 1].size;  // 1,389,312
+
+// 編號 → 擺位描述；越界回 null
+function decodeId(id) {
+  if (id < 0 || id >= RAW_TOTAL) return null;
+  let gi = GROUPS.length - 1;
+  while (OFFSETS[gi] > id) gi--;
+  const g = GROUPS[gi];
+  let rem = id - OFFSETS[gi];
+  const pMask = rem % 32; rem = Math.floor(rem / 32);
+  const cIdx = rem % 36; rem = Math.floor(rem / 36);
+  const rIdx = rem % g.rBase;
+  const hIdx = Math.floor(rem / g.rBase);
+  const hFiles = g.hPairs[hIdx];
+  const rem2 = g.backAvail.filter(f => !hFiles.includes(f));
+  const rFiles = pairs(rem2)[rIdx];
+  return { ePts: g.pts, hFiles, rFiles, cFiles: C_PAIRS[cIdx], pMask };
+}
+
+// 編號 → 局面；結構衝突（炮或進兵疊上象位）回 null
+function setupFromId(id) {
+  const d = decodeId(id);
+  if (!d) return null;
+  const eKey = new Set(d.ePts.map(p => p[0] * 9 + p[1]));
+  for (const f of d.cFiles) if (eKey.has(2 * 9 + f)) return null;           // 炮撞象（宮頂線）
+  for (let i = 0; i < 5; i++)
+    if ((d.pMask >> i) & 1 && eKey.has(4 * 9 + PAWN_FILES[i])) return null; // 進兵撞象（河沿）
+  const bd = emptyBoard();
+  for (const col of [RED, BLACK]) {
+    // 點對稱：黑方 = 紅方旋轉 180°
+    const put = (t, r, c) => {
+      if (col === RED) bd[r][c] = { t, c: col };
+      else bd[9 - r][8 - c] = { t, c: col };
+    };
+    put('K', 0, 4); put('A', 0, 3); put('A', 0, 5);
+    for (const [r, c] of d.ePts) put('B', r, c);
+    for (const f of d.hFiles) put('N', 0, f);
+    for (const f of d.rFiles) put('R', 0, f);
+    for (const f of d.cFiles) put('C', 2, f);
+    for (let i = 0; i < 5; i++) put('P', ((d.pMask >> i) & 1) ? 4 : 3, PAWN_FILES[i]);
+  }
+  return bd;
+}
+
+// side 方所有「合法的首著吃子」（只生吃子著法、個別驗自將——比全合法著法快一個量級）
+function legalCaptures(bd, side) {
+  const out = [];
+  for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) {
+    const p = bd[r][c];
+    if (!p || p.c !== side) continue;
+    for (const [rr, cc] of pseudoMoves(bd, r, c)) {
+      if (!bd[rr][cc]) continue;
+      if (!inCheck(makeMove(bd, r, c, rr, cc), side)) out.push([r, c, rr, cc]);
+    }
+  }
+  return out;
+}
+
+// 首著靜置檢定：
+// (a) 開局即照面或被將 → 不合法
+// (b) 任一首著吃子若非「有根且不虧」（吃後可被反吃、且被吃子價值 ≤ 出手子價值），
+//     也非「對稱可回應」（吃完後對方仍能走點對稱的對應著吃回同型子）→ 不合法
+function quietStartCheck(bd) {
+  if (kingsFacing(bd)) return { ok: false, why: 'facing' };
+  if (inCheck(bd, RED) || inCheck(bd, BLACK)) return { ok: false, why: 'check' };
+  for (const side of [RED, BLACK]) {
+    for (const [r, c, rr, cc] of legalCaptures(bd, side)) {
+      const victim = bd[rr][cc], attacker = bd[r][c];
+      const after = makeMove(bd, r, c, rr, cc);
+      const defended = isAttacked(after, rr, cc, 1 - side);
+      if (defended && VAL[victim.t] <= VAL[attacker.t]) continue;   // 有根且不虧
+      let symOK = false;                                            // 對稱可回應？（點對稱）
+      const o = after[9 - r][8 - c], t = after[9 - rr][8 - cc];
+      if (o && o.c === 1 - side && o.t === attacker.t && t && t.c === side && t.t === victim.t
+          && pseudoMoves(after, 9 - r, 8 - c).some(m => m[0] === 9 - rr && m[1] === 8 - cc)
+          && !inCheck(makeMove(after, 9 - r, 8 - c, 9 - rr, 8 - cc), 1 - side)) symOK = true;
+      if (!symOK) return {
+        ok: false, why: defended ? 'winning-capture' : 'free-capture',
+        detail: { side, r, c, rr, cc, a: attacker.t, v: victim.t },
+      };
+    }
+  }
+  return { ok: true };
+}
+
+// 一站式判定：編號 → { ok, why? }
+function checkId(id) {
+  const bd = setupFromId(id);
+  if (!bd) return { ok: false, why: 'structural' };
+  return quietStartCheck(bd);
+}
+
+// 標準開局編號：象{c1,g1}=組 0、馬{b,h}、車{a,i}、炮{b,h}=cIdx 13、兵全原位
+const STANDARD_ID = (3 * 36 + 13) * 32; // = 3872（組 0 內 hIdx 3、rIdx 0）
+
+// 輕量版：組 0（象 c1,g1）＋兵全原位 ＝ 只隨機車馬炮的子集（216 局，全數合法）
+function liteCandidates() {
+  const out = [];
+  const g = GROUPS[0];
+  for (let hr = 0; hr < g.hrBase; hr++)
+    for (let cI = 0; cI < 36; cI++)
+      out.push(OFFSETS[0] + (hr * 36 + cI) * 32);
+  return out;
+}
+
+// ===== 衍生版本：軸對稱版 =====
+// 加一條限制：每方自身以中線（e 路）左右對稱；此時黑方「旋轉」與「翻面」結果相同，棋形如標準棋端正。
+// 象取對稱點對、馬車炮取對稱路對、兵進格 a=i、c=g、中兵獨立。檢定沿用同一套 quietStartCheck。
+
+const SYM_E_PAIRS = [[0, 1], [2, 4], [5, 6]];              // E_POINTS 索引：{c1,g1}{a3,i3}{c5,g5}
+const SYM_BACK_PAIRS = [[0, 8], [1, 7], [2, 6]];           // 底線對稱路對 {a,i}{b,h}{c,g}
+const SYM_CANNON_PAIRS = [[0, 8], [1, 7], [2, 6], [3, 5]]; // 炮對稱路對 {a,i}{b,h}{c,g}{d,f}
+const SYM_PMASKS = [];                                      // 對稱兵形：bit 序 a,c,e,g,i
+for (let s = 0; s < 8; s++) {
+  SYM_PMASKS.push((s & 1 ? 0b10001 : 0) | (s & 2 ? 0b01010 : 0) | (s & 4 ? 0b00100 : 0));
+}
+const eq2 = (a, b) => a[0] === b[0] && a[1] === b[1];
+
+// 全部軸對稱候選（以編號表示；含結構衝突者，交由 checkId 過濾）
+function symCandidates() {
+  const out = [];
+  for (const ePair of SYM_E_PAIRS) {
+    const eIdx = E_PAIRS.findIndex(p => eq2(p, ePair));
+    const g = GROUPS[eIdx];
+    for (const hPair of SYM_BACK_PAIRS) {
+      const hIdx = g.hPairs.findIndex(p => eq2(p, hPair));
+      if (hIdx < 0) continue;                                // 該路對被底線象佔用
+      const rem = g.backAvail.filter(f => !hPair.includes(f));
+      const rPairs = pairs(rem);
+      for (const rPair of SYM_BACK_PAIRS) {
+        if (eq2(rPair, hPair)) continue;
+        const rIdx = rPairs.findIndex(p => eq2(p, rPair));
+        if (rIdx < 0) continue;
+        for (const cPair of SYM_CANNON_PAIRS) {
+          const cIdx = C_PAIRS.findIndex(p => eq2(p, cPair));
+          for (const mask of SYM_PMASKS) {
+            out.push(OFFSETS[eIdx] + ((hIdx * g.rBase + rIdx) * 36 + cIdx) * 32 + mask);
+          }
+        }
+      }
+    }
+  }
+  return out.sort((a, b) => a - b);
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    E_POINTS, E_PAIRS, BACK_ALL, PAWN_FILES, GROUPS, OFFSETS, RAW_TOTAL,
+    decodeId, setupFromId, legalCaptures, quietStartCheck, checkId,
+    STANDARD_ID, liteCandidates, symCandidates,
+  };
+}
+
+</script>
+<script>
+// cc960 — 演示頁互動層（棋盤 SVG 繪製、走子、三池切換）
+// 只依賴 rules.js 與 setup.js 的全域函式；無任何外部函式庫。
+(function () {
+  'use strict';
+
+  const CELL = 54, MARGIN = 34, NS = 'http://www.w3.org/2000/svg';
+  const X = c => MARGIN + c * CELL;
+  const Y = r => MARGIN + (9 - r) * CELL;
+  const FILES = 'abcdefghi';
+  const PIECE_CH = [
+    { K: '帥', A: '仕', B: '相', N: '傌', R: '俥', C: '炮', P: '兵' },
+    { K: '將', A: '士', B: '象', N: '馬', R: '車', C: '包', P: '卒' },
+  ];
+  const PIECE_FONT = '"DFKai-SB","BiauKai","Kaiti TC","KaiTi","Noto Serif TC",serif';
+  const REASON = {
+    structural: '結構衝突（炮或進兵疊上象位）',
+    'free-capture': '首著可白吃且對稱不可回應',
+    'winning-capture': '首著可低值吃高值',
+    facing: '開局照面', check: '開局被將',
+  };
+
+  const $ = id => document.getElementById(id);
+  const svg = $('board');
+
+  // 輕量版／軸對稱版：候選少，載入時全枚舉並給密集編號；完整版採「即抽即驗」
+  const LISTS = {
+    lite: liteCandidates().filter(id => checkId(id).ok),
+    sym: symCandidates().filter(id => checkId(id).ok),
+  };
+  const MODE_LABEL = { lite: '輕量版', sym: '軸對稱版' };
+  const curList = () => LISTS[S.mode] || null;
+
+  const S = {
+    mode: 'full', id: STANDARD_ID,
+    bd: null, turn: RED, sel: null, dests: [],
+    hist: [], last: null, over: null,
+  };
+
+  function el(name, attrs, text) {
+    const n = document.createElementNS(NS, name);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  // --- 棋盤靜態層 ---
+  function drawStatic(g) {
+    g.appendChild(el('rect', { x: 0, y: 0, width: 500, height: 554, rx: 6, fill: 'var(--board)', stroke: 'var(--board-edge)', 'stroke-width': 3 }));
+    g.appendChild(el('rect', { x: MARGIN - 7, y: MARGIN - 7, width: 8 * CELL + 14, height: 9 * CELL + 14, fill: 'none', stroke: 'var(--board-line)', 'stroke-width': 2.5 }));
+    const line = (x1, y1, x2, y2, w) => g.appendChild(el('line', { x1, y1, x2, y2, stroke: 'var(--board-line)', 'stroke-width': w || 1.2 }));
+    for (let r = 0; r <= 9; r++) line(X(0), Y(r), X(8), Y(r));
+    for (let c = 0; c <= 8; c++) {
+      if (c === 0 || c === 8) line(X(c), Y(0), X(c), Y(9));
+      else { line(X(c), Y(0), X(c), Y(4)); line(X(c), Y(5), X(c), Y(9)); }
+    }
+    for (const [r1, r2] of [[0, 2], [9, 7]]) {
+      line(X(3), Y(r1), X(5), Y(r2)); line(X(5), Y(r1), X(3), Y(r2));
+    }
+    const ym = (Y(4) + Y(5)) / 2;
+    for (const [t, x] of [['楚 河', X(2)], ['漢 界', X(6)]]) {
+      g.appendChild(el('text', {
+        x, y: ym, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+        fill: 'var(--board-line)', 'font-size': 24, 'letter-spacing': '8',
+        'font-family': PIECE_FONT, opacity: .85,
+      }, t));
+    }
+    const mark = (r, c) => {
+      const x = X(c), y = Y(r), d = 5, o = 8, p = [];
+      if (c > 0) p.push(`M${x - o - d} ${y - o} h${d} v${-d}`, `M${x - o - d} ${y + o} h${d} v${d}`);
+      if (c < 8) p.push(`M${x + o + d} ${y - o} h${-d} v${-d}`, `M${x + o + d} ${y + o} h${-d} v${d}`);
+      g.appendChild(el('path', { d: p.join(' '), fill: 'none', stroke: 'var(--board-line)', 'stroke-width': 1.2 }));
+    };
+    for (const c of [0, 2, 4, 6, 8]) { mark(3, c); mark(6, c); }
+    for (let c = 0; c <= 8; c++) g.appendChild(el('text', { x: X(c), y: 554 - 8, 'text-anchor': 'middle', fill: 'var(--board-line)', 'font-size': 11, opacity: .7 }, FILES[c]));
+    for (let r = 0; r <= 9; r++) g.appendChild(el('text', { x: 12, y: Y(r) + 4, 'text-anchor': 'middle', fill: 'var(--board-line)', 'font-size': 11, opacity: .7 }, String(r + 1)));
+  }
+
+  // --- 全盤重繪 ---
+  function render() {
+    svg.textContent = '';
+    const g = el('g', {});
+    drawStatic(g);
+
+    if (S.last) {
+      const [fr, fc, tr, tc] = S.last;
+      g.appendChild(el('circle', { cx: X(fc), cy: Y(fr), r: 6, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2, opacity: .6 }));
+      g.appendChild(el('circle', { cx: X(tc), cy: Y(tr), r: 27, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2, opacity: .6 }));
+    }
+
+    const checked = !S.over && inCheck(S.bd, S.turn) ? findKing(S.bd, S.turn) : null;
+    for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) {
+      const p = S.bd[r][c];
+      if (!p) continue;
+      const sel = S.sel && S.sel[0] === r && S.sel[1] === c;
+      const pg = el('g', { class: 'piece', style: 'cursor:pointer' });
+      pg.appendChild(el('circle', { cx: X(c), cy: Y(r), r: 23, fill: 'var(--piece-face)', stroke: sel ? 'var(--accent)' : 'var(--piece-rim)', 'stroke-width': sel ? 3 : 1.5 }));
+      const tone = p.c === RED ? 'var(--red)' : 'var(--black-piece)';
+      pg.appendChild(el('circle', { cx: X(c), cy: Y(r), r: 19.5, fill: 'none', stroke: tone, 'stroke-width': 1, opacity: .75 }));
+      pg.appendChild(el('text', {
+        x: X(c), y: Y(r), 'text-anchor': 'middle', 'dominant-baseline': 'central',
+        'font-size': 26, 'font-family': PIECE_FONT, 'font-weight': 700, fill: tone,
+      }, PIECE_CH[p.c][p.t]));
+      if (checked && p.t === 'K' && p.c === S.turn) {
+        pg.appendChild(el('circle', { cx: X(c), cy: Y(r), r: 26, fill: 'none', stroke: 'var(--warn)', 'stroke-width': 3 }));
+      }
+      g.appendChild(pg);
+    }
+
+    for (const [rr, cc] of S.dests) {
+      if (S.bd[rr][cc]) g.appendChild(el('circle', { cx: X(cc), cy: Y(rr), r: 27, fill: 'none', stroke: 'var(--hint)', 'stroke-width': 3.5 }));
+      else g.appendChild(el('circle', { cx: X(cc), cy: Y(rr), r: 7.5, fill: 'var(--hint)' }));
+    }
+    svg.appendChild(g);
+    renderPanel();
+  }
+
+  function renderPanel() {
+    const list = curList();
+    if (list) {
+      $('info-id-wrap').innerHTML = MODE_LABEL[S.mode] + ' <b>#' + (list.indexOf(S.id) + 1) + '／' + list.length + '</b>（編號 ' + S.id + '）';
+      $('posid').min = 1; $('posid').max = list.length;
+    } else {
+      $('info-id-wrap').innerHTML = '編號 <b>' + S.id + '</b>';
+      $('posid').min = 0; $('posid').max = RAW_TOTAL - 1;
+    }
+    $('info-mob').textContent = legalMoves(setupFromId(S.id), RED).length + ' 著';
+    $('btn-undo').disabled = S.hist.length === 0;
+    const st = $('status');
+    if (S.over) {
+      st.innerHTML = '<span class="over">' + S.over + '</span>';
+    } else {
+      st.innerHTML = (S.turn === RED ? '<span class="turn-red">● 紅方走子</span>' : '<span class="turn-black">● 黑方走子</span>')
+        + (inCheck(S.bd, S.turn) ? '<span class="check">將軍！</span>' : '');
+    }
+  }
+
+  // --- 局面載入 ---
+  function loadId(id, note) {
+    S.id = id;
+    S.bd = setupFromId(id);
+    S.turn = RED; S.sel = null; S.dests = []; S.hist = []; S.last = null; S.over = null;
+    $('moves').textContent = '';
+    const list = curList();
+    $('posid').value = list ? list.indexOf(id) + 1 : id;
+    $('gen-note').textContent = note || '';
+    render();
+  }
+
+  // --- 行棋 ---
+  function notation(bd, r, c, rr, cc) {
+    const p = bd[r][c], v = bd[rr][cc];
+    return PIECE_CH[p.c][p.t] + FILES[c] + (r + 1) + (v ? '×' : '–') + FILES[cc] + (rr + 1) + (v ? PIECE_CH[v.c][v.t] : '');
+  }
+
+  function doMove(r, c, rr, cc) {
+    S.hist.push({ bd: S.bd, turn: S.turn, last: S.last, over: S.over });
+    const li = document.createElement('li');
+    li.textContent = notation(S.bd, r, c, rr, cc);
+    if (S.turn === RED) li.className = 'red-mv';
+    $('moves').appendChild(li);
+    $('movelist').scrollTop = 1e6;
+    S.bd = makeMove(S.bd, r, c, rr, cc);
+    S.last = [r, c, rr, cc];
+    S.turn = 1 - S.turn;
+    S.sel = null; S.dests = [];
+    if (legalMoves(S.bd, S.turn).length === 0) {
+      const how = inCheck(S.bd, S.turn) ? '將死' : '困斃';
+      S.over = how + '，' + (S.turn === RED ? '黑方勝' : '紅方勝');
+    }
+    render();
+  }
+
+  svg.addEventListener('click', ev => {
+    if (S.over) return;
+    const rect = svg.getBoundingClientRect();
+    const sx = 500 / rect.width;
+    const px = (ev.clientX - rect.left) * sx, py = (ev.clientY - rect.top) * sx;
+    const c = Math.round((px - MARGIN) / CELL), rInv = Math.round((py - MARGIN) / CELL);
+    const r = 9 - rInv;
+    if (c < 0 || c > 8 || r < 0 || r > 9) return;
+    if (Math.abs(px - X(c)) > CELL / 2 - 2 || Math.abs(py - Y(r)) > CELL / 2 - 2) return;
+
+    if (S.sel && S.dests.some(d => d[0] === r && d[1] === c)) {
+      doMove(S.sel[0], S.sel[1], r, c);
+      return;
+    }
+    const p = S.bd[r][c];
+    if (p && p.c === S.turn) {
+      S.sel = [r, c];
+      S.dests = legalMoves(S.bd, S.turn).filter(m => m[0] === r && m[1] === c).map(m => [m[2], m[3]]);
+    } else {
+      S.sel = null; S.dests = [];
+    }
+    render();
+  });
+
+  // --- 控制列 ---
+  $('btn-random').addEventListener('click', () => {
+    const list = curList();
+    if (list) { loadId(list[Math.floor(Math.random() * list.length)]); return; }
+    let id;                                 // 即抽即驗（接受率約 24%，均攤數次，毫秒級）
+    do { id = Math.floor(Math.random() * RAW_TOTAL); } while (!checkId(id).ok);
+    loadId(id);
+  });
+  $('btn-standard').addEventListener('click', () => loadId(STANDARD_ID));
+  function gotoInput() {
+    const n = parseInt($('posid').value, 10);
+    const list = curList();
+    if (list) {
+      const k = Math.max(1, Math.min(list.length, n || 1));
+      loadId(list[k - 1]);
+      return;
+    }
+    let id = Math.max(0, Math.min(RAW_TOTAL - 1, isNaN(n) ? 0 : n));
+    const res = checkId(id);
+    if (res.ok) { loadId(id); return; }
+    let next = id;                          // 往後找最近的合法編號（循環）
+    do { next = (next + 1) % RAW_TOTAL; } while (!checkId(next).ok);
+    loadId(next, '編號 ' + id + ' 不合法（' + (REASON[res.why] || res.why) + '），已跳至最近的合法編號 ' + next);
+  }
+  $('btn-goto').addEventListener('click', gotoInput);
+  $('posid').addEventListener('keydown', ev => { if (ev.key === 'Enter') gotoInput(); });
+  $('btn-reset').addEventListener('click', () => loadId(S.id));
+  $('btn-undo').addEventListener('click', () => {
+    const h = S.hist.pop();
+    if (!h) return;
+    S.bd = h.bd; S.turn = h.turn; S.last = h.last; S.over = h.over;
+    S.sel = null; S.dests = [];
+    const ml = $('moves');
+    if (ml.lastChild) ml.removeChild(ml.lastChild);
+    render();
+  });
+  $('mode').addEventListener('change', ev => {
+    S.mode = ev.target.value;
+    const list = curList();
+    if (list && !list.includes(S.id)) loadId(STANDARD_ID);
+    else loadId(S.id);
+  });
+
+  // 開場：標準開局（讓「跟標準只差在哪」一目瞭然，再讓使用者自己抽）
+  loadId(STANDARD_ID);
+})();
+
+</script>
+
+</body>
+</html>

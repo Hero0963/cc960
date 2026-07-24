@@ -1,0 +1,19 @@
+{
+  "name": "cc960",
+  "version": "0.3.0",
+  "description": "隨機開局象棋 — 借鑑 Chess960 的中國象棋變體：走法完全不變，只隨機開局擺放（規格 v3・合法開局 339,484 種）",
+  "keywords": ["xiangqi", "chinese-chess", "chess960", "chess-variant", "象棋"],
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/Hero0963/cc960.git" },
+  "homepage": "https://hero0963.github.io/cc960/",
+  "main": "src/setup.js",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "count": "node scripts/count.js",
+    "stats": "node scripts/stats.js",
+    "test": "node scripts/build.js && node test/test-dom.js"
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  }
+}
