@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node D:/it_project/cc960/.claude/session-brief.js",
+            "timeout": 20,
+            "statusMessage": "cc960 現況…"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run build)",
+      "Bash(npm run count)",
+      "Bash(npm run stats)",
+      "Bash(npm install)",
+      "Bash(node scripts/*)",
+      "Bash(node test/*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "PowerShell(npm test)",
+      "PowerShell(npm run *)",
+      "PowerShell(node scripts/*)",
+      "PowerShell(git status*)",
+      "PowerShell(git diff*)",
+      "PowerShell(git log*)"
+    ]
+  }
+}

@@ -2,3 +2,25 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+
+# Claude Code：.claude/settings.json 有進版控（共用設定），個人覆寫不進
+.claude/settings.local.json
+
+# 暫存、實驗產物、截圖草稿
+scratch/
+tmp/
+out/
+*.tmp
+
+# 引擎與大型二進位（Pikafish 審局池會用到，不進版控）
+engine/
+*.exe
+*.nnue
+*.bin
+
+# 軟刪除暫存區（依全域規範，移除的東西放這裡，不進版控也不清空）
+soft-delete/
+
+# 編輯器
+.vscode/
+.idea/
