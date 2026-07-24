@@ -60,7 +60,7 @@ cc960 把**開局擺法隨機抽**，讓背譜失效、第一步就得靠棋力�
 | 想玩玩看 | [線上 demo](https://hero0963.github.io/cc960/) → 按「🎲 隨機一局」 |
 | 棋手／對這個提案有意見 | [docs/rationale.md](docs/rationale.md)（問題數據、方案比較、公平性、已知風險） |
 | 開發者、想改規則或接手 | [docs/spec.md](docs/spec.md)（規格正本）＋ [CONTRIBUTING.md](CONTRIBUTING.md)（開發流程） |
-| AI coding agent | [AGENTS.md](AGENTS.md)（任務入口、驗證指令、不可破壞的不變量） |
+| AI coding agent | [CONTRIBUTING.md](CONTRIBUTING.md)（結構、指令、開發規則）＋ [docs/spec.md](docs/spec.md)（規格正本） |
 
 ## 開發
 

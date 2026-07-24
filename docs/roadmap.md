@@ -1,7 +1,7 @@
 # 現況與下一步
 
 > 新 session 的第一站。**每次工作告一段落就更新這裡**（現況一句話、下一步順序、進度日誌加一列）。
-> 規格看 [spec.md](spec.md)、設計理由看 [rationale.md](rationale.md)、接手規範看 [../AGENTS.md](../AGENTS.md)。
+> 規格看 [spec.md](spec.md)、設計理由看 [rationale.md](rationale.md)、開發規則看 [../CONTRIBUTING.md](../CONTRIBUTING.md)。
 > 最後更新：2026-07-25
 
 ## 現況（2026-07-25）
