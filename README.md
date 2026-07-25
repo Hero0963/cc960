@@ -32,6 +32,7 @@
 **為什麼是點對稱而不是左右鏡像**：鏡像下雙方強翼同路正面相對，最省力的下法就是硬碰硬兌子——正好走回和棋軌道。點對稱讓強翼錯開，天然形成兩翼互攻。（Chess960 本身是鏡像；點對稱是 cc960 的設計差異。）
 
 規則細節、編號系統、已否決的方向以 **[docs/spec.md](docs/spec.md)**（規格正本）為準；
+程式怎麼組起來的見 **[docs/architecture.md](docs/architecture.md)**；
 問題數據、方案比較與公平性討論見 **[docs/rationale.md](docs/rationale.md)**。
 
 ## 關鍵數字
