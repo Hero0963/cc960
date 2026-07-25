@@ -11,7 +11,7 @@
 git clone https://github.com/Hero0963/cc960.git
 cd cc960
 npm install
-npm test          # build ＋ 16 項無頭 DOM 測試
+npm test          # build ＋ 20 項無頭 DOM 測試
 ```
 
 ## 指令
@@ -19,7 +19,7 @@ npm test          # build ＋ 16 項無頭 DOM 測試
 | 指令 | 用途 | 耗時 |
 |------|------|------|
 | `npm run build` | `src/` → `docs/index.html`（單檔演示頁） | 即時 |
-| `npm test` | build ＋ 16 項 jsdom 迴歸測試 | 數秒 |
+| `npm test` | build ＋ 20 項 jsdom 迴歸測試 | 數秒 |
 | `npm run count` | 全空間枚舉：合法局面數、淘汰分解、機動力抽樣 | 約 20–25 秒 |
 | `npm run stats` | 特徵統計＋終端機渲染示範局面 | 約 25 秒 |
 
@@ -57,7 +57,7 @@ docs/index.html    建置產物 — 請勿手改
 | **行棋 bug** | 局面編號 ＋ 走子序列 ＋ 預期與實際行為 |
 | **規則設計意見** | 你的棋力背景（有助判斷）、具體想改什麼、理由；歡迎反對意見 |
 | **試玩心得** | 用哪個池、下了幾局、主觀感受（新鮮度／守和難度／彆扭的地方）——這正是目前最缺的資料 |
-| **新變體提案** | 對照 `docs/spec.md §9` 的 v4 方向；說明會不會破壞「預走合法步」與點對稱兩個核心原則 |
+| **新變體提案** | 對照 `docs/spec.md §10` 的 v4 方向；說明會不會破壞「預走合法步」與點對稱兩個核心原則 |
 
 ## PR
 

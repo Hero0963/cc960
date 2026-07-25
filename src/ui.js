@@ -26,8 +26,15 @@
   const LISTS = {
     lite: liteCandidates().filter(id => checkId(id).ok),
     sym: symCandidates().filter(id => checkId(id).ok),
+    balanced: balancedCandidates().filter(id => checkId(id).ok),
   };
-  const MODE_LABEL = { lite: '輕量版', sym: '軸對稱版' };
+  const MODE_LABEL = { lite: '輕量版', sym: '軸對稱版', balanced: '平衡版' };
+  // 平衡版的名單是實測結果，不是算出來的——切到該池時直接說明驗證手法，不要藏在摺疊區裡
+  const MODE_NOTE = {
+    balanced: '本池 70 局由 Pikafish 2026-01-02（NNUE）於固定深度 40、單執行緒逐局評估，'
+      + '保留紅方先手優勢 ≤ 40 釐兵者（100 釐兵 ≈ 50% 勝率；標準開局為 18 釐兵，也在池內）。'
+      + '這些局面公平，且最佳著與第三選擇平均只差 10 釐兵——沒有唯一解，下法選擇多。',
+  };
   const curList = () => LISTS[S.mode] || null;
 
   const S = {
@@ -142,7 +149,7 @@
     $('moves').textContent = '';
     const list = curList();
     $('posid').value = list ? list.indexOf(id) + 1 : id;
-    $('gen-note').textContent = note || '';
+    $('gen-note').textContent = note || MODE_NOTE[S.mode] || '';
     render();
   }
 

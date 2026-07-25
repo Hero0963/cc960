@@ -133,6 +133,7 @@
         <div class="controls">
           <select id="mode" aria-label="版本">
             <option value="full">完整版（合法開局 339,484 種）</option>
+            <option value="balanced">平衡版（70 局・引擎驗證過的平衡開局）</option>
             <option value="sym">軸對稱版（146 局・每方自身左右對稱）</option>
             <option value="lite">輕量版（216 局・象兵固定，只隨機車馬炮）</option>
           </select>
@@ -174,6 +175,11 @@
             <li>「首著靜置檢定」剔除失衡開局：任一首著吃子須<b>有根且不虧</b>，或<b>對稱可回應</b>（吃完後對方仍能走點對稱的對應著吃回同型子），否則局面不合法。</li>
             <li>編號空間 1,389,312，其中合法 <b>339,484</b> 種（含標準開局＝編號 3872）。輕量版＝象、兵固定只隨機車馬炮，<b>216 局全數合法</b>（標準開局＝其 #122）。</li>
             <li><b>軸對稱版</b>（衍生版本）：加一條限制——每方自身以中線左右對稱（此時黑方旋轉與翻面結果相同，棋形如標準棋端正），合法開局 <b>146</b> 局（標準開局＝其 #21）。</li>
+            <li><b>平衡版</b>（<b>70 局・引擎驗證</b>）：把輕量版 216 局全部交給象棋引擎評估，只留下先手優勢夠小的 70 局。<br>
+              <span class="muted"><b>驗證手法</b>：引擎 <b>Pikafish 2026-01-02</b>（UCI／NNUE），固定 <b>深度 40</b>、單執行緒、置換表 1024 MB、MultiPV 1，逐局取紅方先手優勢，保留 <b>|評估| ≤ 40 釐兵</b> 者，驗證日期 2026-07-25。<br>
+              量尺說明：現代引擎的評估已正規化到勝率，<b>100 釐兵 ≈ 50% 勝率</b>，故 40 釐兵約當紅方勝率一成上下——與標準開局（18 釐兵，也在本池內）同一級距。<br>
+              未入選者多半是開局就能強襲的局面，最極端者達 485 釐兵（紅方勝率近 100%）。完整分布與方法見 <a href="https://github.com/Hero0963/cc960/blob/main/docs/spec.md">docs/spec.md §8</a>。<br>
+              這 70 局都<b>公平且有多種可行下法</b>——引擎的最佳著與第三選擇平均只差 10 釐兵，代表沒有「唯一解」，留給棋手的選擇空間大。</span></li>
             <li class="muted">本演示未實作長打（長將、長捉）禁著判例；棋規判例依中國象棋競賽規則。</li>
           </ul>
         </details>
@@ -501,6 +507,29 @@ function liteCandidates() {
   return out;
 }
 
+// ===== 衍生版本：平衡版（引擎驗證）=====
+// 輕量版 216 局全部餵給 Pikafish 2026-01-02（UCI，NNUE），固定 depth 40、單執行緒、
+// 置換表 1024 MB、MultiPV 1，逐局取紅方先手優勢；保留 |評估| ≤ 40 釐兵者共 70 局。
+// 40 釐兵的量尺意義：Pikafish 的評估已正規化到勝率，100 釐兵 ≈ 50% 勝率，
+// 故 40 釐兵約當「紅方勝率 11% 上下」——與標準開局（18 釐兵）同一級距。
+// 驗證日期 2026-07-25；方法與完整分布見 docs/spec.md §8。
+// 此表是實測結果，不是算出來的：改動擺法規則或檢定後必須重新評估。
+const BALANCED_IDS = [
+  0, 192, 256, 352, 448, 992, 1056, 1120,
+  1152, 1216, 1344, 1408, 1440, 1536, 1600, 1728,
+  1760, 2208, 3488, 3520, 3552, 3584, 3616, 3648,
+  3680, 3712, 3744, 3776, 3808, 3840, 3872, 3904,
+  3936, 3968, 4000, 4032, 4064, 4096, 4128, 4160,
+  4192, 4224, 4256, 4288, 4320, 4352, 4384, 4416,
+  4448, 4480, 4512, 4544, 4800, 4864, 4992, 5056,
+  5184, 5216, 5344, 5568, 5600, 5664, 5728, 5952,
+  6016, 6048, 6080, 6208, 6528, 6816,
+];
+
+function balancedCandidates() {
+  return BALANCED_IDS.slice();
+}
+
 // ===== 衍生版本：軸對稱版 =====
 // 加一條限制：每方自身以中線（e 路）左右對稱；此時黑方「旋轉」與「翻面」結果相同，棋形如標準棋端正。
 // 象取對稱點對、馬車炮取對稱路對、兵進格 a=i、c=g、中兵獨立。檢定沿用同一套 quietStartCheck。
@@ -545,7 +574,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     E_POINTS, E_PAIRS, BACK_ALL, PAWN_FILES, GROUPS, OFFSETS, RAW_TOTAL,
     decodeId, setupFromId, legalCaptures, quietStartCheck, checkId,
-    STANDARD_ID, liteCandidates, symCandidates,
+    STANDARD_ID, liteCandidates, symCandidates, balancedCandidates, BALANCED_IDS,
   };
 }
 
@@ -579,8 +608,15 @@ if (typeof module !== 'undefined') {
   const LISTS = {
     lite: liteCandidates().filter(id => checkId(id).ok),
     sym: symCandidates().filter(id => checkId(id).ok),
+    balanced: balancedCandidates().filter(id => checkId(id).ok),
   };
-  const MODE_LABEL = { lite: '輕量版', sym: '軸對稱版' };
+  const MODE_LABEL = { lite: '輕量版', sym: '軸對稱版', balanced: '平衡版' };
+  // 平衡版的名單是實測結果，不是算出來的——切到該池時直接說明驗證手法，不要藏在摺疊區裡
+  const MODE_NOTE = {
+    balanced: '本池 70 局由 Pikafish 2026-01-02（NNUE）於固定深度 40、單執行緒逐局評估，'
+      + '保留紅方先手優勢 ≤ 40 釐兵者（100 釐兵 ≈ 50% 勝率；標準開局為 18 釐兵，也在池內）。'
+      + '這些局面公平，且最佳著與第三選擇平均只差 10 釐兵——沒有唯一解，下法選擇多。',
+  };
   const curList = () => LISTS[S.mode] || null;
 
   const S = {
@@ -695,7 +731,7 @@ if (typeof module !== 'undefined') {
     $('moves').textContent = '';
     const list = curList();
     $('posid').value = list ? list.indexOf(id) + 1 : id;
-    $('gen-note').textContent = note || '';
+    $('gen-note').textContent = note || MODE_NOTE[S.mode] || '';
     render();
   }
 

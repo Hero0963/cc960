@@ -139,6 +139,29 @@ function liteCandidates() {
   return out;
 }
 
+// ===== 衍生版本：平衡版（引擎驗證）=====
+// 輕量版 216 局全部餵給 Pikafish 2026-01-02（UCI，NNUE），固定 depth 40、單執行緒、
+// 置換表 1024 MB、MultiPV 1，逐局取紅方先手優勢；保留 |評估| ≤ 40 釐兵者共 70 局。
+// 40 釐兵的量尺意義：Pikafish 的評估已正規化到勝率，100 釐兵 ≈ 50% 勝率，
+// 故 40 釐兵約當「紅方勝率 11% 上下」——與標準開局（18 釐兵）同一級距。
+// 驗證日期 2026-07-25；方法與完整分布見 docs/spec.md §8。
+// 此表是實測結果，不是算出來的：改動擺法規則或檢定後必須重新評估。
+const BALANCED_IDS = [
+  0, 192, 256, 352, 448, 992, 1056, 1120,
+  1152, 1216, 1344, 1408, 1440, 1536, 1600, 1728,
+  1760, 2208, 3488, 3520, 3552, 3584, 3616, 3648,
+  3680, 3712, 3744, 3776, 3808, 3840, 3872, 3904,
+  3936, 3968, 4000, 4032, 4064, 4096, 4128, 4160,
+  4192, 4224, 4256, 4288, 4320, 4352, 4384, 4416,
+  4448, 4480, 4512, 4544, 4800, 4864, 4992, 5056,
+  5184, 5216, 5344, 5568, 5600, 5664, 5728, 5952,
+  6016, 6048, 6080, 6208, 6528, 6816,
+];
+
+function balancedCandidates() {
+  return BALANCED_IDS.slice();
+}
+
 // ===== 衍生版本：軸對稱版 =====
 // 加一條限制：每方自身以中線（e 路）左右對稱；此時黑方「旋轉」與「翻面」結果相同，棋形如標準棋端正。
 // 象取對稱點對、馬車炮取對稱路對、兵進格 a=i、c=g、中兵獨立。檢定沿用同一套 quietStartCheck。
@@ -183,6 +206,6 @@ if (typeof module !== 'undefined') {
   module.exports = {
     E_POINTS, E_PAIRS, BACK_ALL, PAWN_FILES, GROUPS, OFFSETS, RAW_TOTAL,
     decodeId, setupFromId, legalCaptures, quietStartCheck, checkId,
-    STANDARD_ID, liteCandidates, symCandidates,
+    STANDARD_ID, liteCandidates, symCandidates, balancedCandidates, BALANCED_IDS,
   };
 }

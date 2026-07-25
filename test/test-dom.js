@@ -86,6 +86,26 @@ $('btn-random').dispatchEvent(new window.MouseEvent('click', { bubbles: true }))
   ok(bad === 0, '軸對稱版隨機局面自身左右對稱（編號 ' + id + '，違反格數 ' + bad + '）');
 }
 
+// 6.5) 平衡版：70 局（引擎驗證過的名單）、標準開局在池內、全數通過靜置檢定
+$('mode').value = 'balanced';
+$('mode').dispatchEvent(new window.Event('change', { bubbles: true }));
+ok($('info-id-wrap').textContent.includes('／70'), '平衡版共 70 局面（實際: ' + $('info-id-wrap').textContent + '）');
+$('btn-standard').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+ok($('info-id-wrap').textContent.includes('／70') && $('info-id-wrap').textContent.includes('編號 3872'),
+  '標準開局在平衡版池內（實際: ' + $('info-id-wrap').textContent + '）');
+{
+  // 名單是實測結果，硬編在 setup.js；至少要保證每一局都仍然合法且是輕量版的子集
+  const lite = new Set(window.liteCandidates());
+  const bad = window.balancedCandidates().filter(id => !window.checkId(id).ok || !lite.has(id));
+  ok(bad.length === 0, '平衡版 70 局全數合法且屬輕量版子集（違反 ' + bad.length + ' 局）');
+}
+{
+  // 名單是實測結果，介面必須主動說明驗證手法（引擎、深度、閾值），不能只留在摺疊的規則區
+  const note = $('gen-note').textContent;
+  ok(note.includes('Pikafish') && note.includes('40'),
+    '平衡版會顯示驗證手法（實際開頭: ' + note.slice(0, 28) + '…）');
+}
+
 // 7) 切回完整版、連抽 5 局皆完整
 $('mode').value = 'full';
 $('mode').dispatchEvent(new window.Event('change', { bubbles: true }));

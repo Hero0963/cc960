@@ -96,6 +96,7 @@
 | `STANDARD_ID` | `(3 * 36 + 13) * 32` = **3872**，標準開局 |
 | `liteCandidates()` | 輕量版候選（象固定 c1/g1、兵全原位）**216 個** |
 | `symCandidates()` | 軸對稱版候選（每方自身左右對稱）；靠 `SYM_E_PAIRS` / `SYM_BACK_PAIRS` / `SYM_CANNON_PAIRS` / `SYM_PMASKS` 四張對稱表產生 |
+| `balancedCandidates()` / `BALANCED_IDS` | 平衡版 70 局。**這張表是引擎實測結果、不是算出來的**——改動擺法規則或檢定後必須重新評估（見 [spec.md §8](spec.md)） |
 
 ⚠ 兩個 `Candidates()` 回的是**候選編號，尚未過檢定**，呼叫端要自行 `filter(id => checkId(id).ok)`。
 
@@ -117,7 +118,7 @@
 （**注意 Y 是反的**：`row 0` 是紅方底線，畫在畫面下方。）
 
 **狀態**：單一物件 `S`（目前盤面、選取格、棋譜、模式、編號）。
-**池切換**：`LISTS`（`lite` / `sym` 的密集編號陣列）＋ `MODE_LABEL`；`curList()` 回目前池，完整版回 `null`（沿用原始編號）。
+**池切換**：`LISTS`（`lite` / `sym` / `balanced` 的密集編號陣列）＋ `MODE_LABEL` ＋ `MODE_NOTE`（切到該池時顯示的說明，平衡版用它標示驗證手法）；`curList()` 回目前池，完整版回 `null`（沿用原始編號）。
 
 ### 2.4 `src/shell.html`（190 行）— 演示頁外殼
 
@@ -140,7 +141,7 @@ HTML 結構、CSS、所有對外文案。**三個注入點**是純註解，`buil
 | `scripts/build.js`（26 行） | 把 shell ＋ 三個 js **內聯**成單檔 `docs/index.html`：讀 shell → 換三個注入點 → 在 `</style>` 處切開 → 補 doctype/head/body | `npm run build` |
 | `scripts/count.js`（62 行） | **全空間枚舉**：點對稱抽驗、標準局驗證、139 萬編號逐一 `checkId`、淘汰分解、機動力抽樣 | `npm run count`（約 19 秒） |
 | `scripts/stats.js`（44 行） | 特徵統計（進兵比例、高位象比例）＋ 用中文字在終端機渲染示範局面 | `npm run stats` |
-| `test/test-dom.js`（100 行） | **16 項無頭 DOM 迴歸測試** | `npm test` |
+| `test/test-dom.js` | **20 項無頭 DOM 迴歸測試** | `npm test` |
 
 ### `test-dom.js` 的關鍵設計
 
