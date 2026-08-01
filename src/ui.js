@@ -46,7 +46,7 @@
     return poolCache[key];
   }
 
-  // 只給平衡盤面時，池就是那 280 局與目前棋種勾選的交集（全勾時即全部 280 局）
+  // 只給平衡盤面時，池就是那 351 局與目前棋種勾選的交集（全勾時即全部 351 局）
   function balancedPoolFor(sel) {
     const key = 'B' + selKey(sel);
     if (!(key in poolCache)) {
@@ -120,7 +120,7 @@
     $('info-id').textContent = S.id;
     $('fen').textContent = toFen(bd);
     const cp = balancedEval(S.id);
-    $('info-eval').textContent = cp === null ? '' : '· 引擎實測先手優勢 ' + cp + ' 釐兵';
+    $('info-eval').textContent = cp === null ? '' : '· 引擎實測先手優勢 ' + cp + ' 分';
     $('info-eval').className = cp === null ? '' : 'eval';
   }
 

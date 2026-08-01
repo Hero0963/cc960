@@ -34,8 +34,9 @@ scripts/build.js   組裝：shell ＋ 三個 js 內聯 → docs/index.html
 scripts/count.js   全空間枚舉驗證
 scripts/stats.js   特徵統計
 test/test-dom.js   無頭 DOM 迴歸測試（測建置後的成品）
-docs/spec.md       規格正本 ★
-docs/rationale.md  設計動機與方案評估
+docs/project-guide.md  規則、數字、用法、設計理由、賽制（README 拆出來的部分）
+docs/spec.md       規格與程式架構正本 ★
+docs/roadmap.md    現況、下一步、決策紀錄
 docs/index.html    建置產物 — 請勿手改
 ```
 
@@ -44,7 +45,7 @@ docs/index.html    建置產物 — 請勿手改
 ## 開發規則
 
 1. **規格先行**：任何規則變更，先改 `docs/spec.md` 再改程式。程式與規格不一致時以規格為準。
-2. **改完必驗**：動到 `src/setup.js` 的規則或檢定 → 一定要跑 `npm run count`，並把新數字更新到 `docs/spec.md §5`、`§7 版本歷程`、`README.md`、`package.json`、`scripts/build.js` 的 meta description。
+2. **改完必驗**：動到 `src/setup.js` 的規則或檢定 → 一定要跑 `npm run count`，並把新數字更新到 `docs/spec.md §5`、`§7 版本歷程`、`docs/project-guide.md` 關鍵數字表、`README.md`、`package.json`、`scripts/build.js` 的 meta description。
 3. **測試要一起改**：測試裡寫死了 3872／216／16／10803／標準開局 FEN 等期望值，規格改了要同步更新。
 4. 保持**零相依、單檔可離線**的產生器頁；不要引入框架或 bundler。用瀏覽器 API 時要為 `file://` 準備 fallback。
 5. 程式註解用繁體中文，寫「為什麼」；棋類術語用棋手講法。

@@ -111,21 +111,21 @@ setCk(['e', 'n', 'r', 'c', 'p']);
 {
   $('ck-balanced').checked = true;
   $('ck-balanced').dispatchEvent(new window.Event('change', { bubbles: true }));
-  ok($('pool-note').textContent.includes('引擎驗證平衡 280 局'),
-    '全勾＋平衡篩選 ＝ 280 局（實際: ' + $('pool-note').textContent + '）');
+  ok($('pool-note').textContent.includes('引擎驗證平衡 351 局'),
+    '全勾＋平衡篩選 ＝ 351 局（實際: ' + $('pool-note').textContent + '）');
   const bal = new Set(window.balancedCandidates());
   let allIn = true, allMeasured = true;
   for (let i = 0; i < 20; i++) {
     click('btn-random');
     if (!bal.has(curId())) allIn = false;
-    if (Math.abs(window.balancedEval(curId())) > 40) allMeasured = false;
+    if (Math.abs(window.balancedEval(curId())) > 50) allMeasured = false;
   }
-  ok(allIn, '平衡篩選下連抽 20 局都在 280 局名單內');
-  ok(allMeasured, '抽到的每一局實測評估都 ≤ 40 釐兵');
+  ok(allIn, '平衡篩選下連抽 20 局都在 351 局名單內');
+  ok(allMeasured, '抽到的每一局實測分數都 ≤ 50 分');
   // 與棋種勾選取交集：只隨機馬車炮時應退回原本那 70 局
   setCk(['n', 'r', 'c']);
-  ok($('pool-note').textContent.includes('引擎驗證平衡 70 局'),
-    '平衡篩選 ∩ 只隨機馬車炮 ＝ 70 局（實際: ' + $('pool-note').textContent + '）');
+  ok($('pool-note').textContent.includes('引擎驗證平衡 94 局'),
+    '平衡篩選 ∩ 只隨機馬車炮 ＝ 94 局（實際: ' + $('pool-note').textContent + '）');
   setCk(['e', 'n', 'r', 'c', 'p']);
   $('ck-balanced').checked = false;
   $('ck-balanced').dispatchEvent(new window.Event('change', { bubbles: true }));
@@ -134,8 +134,8 @@ setCk(['e', 'n', 'r', 'c', 'p']);
 
 // 5.9) 有實測值的局面要顯示引擎評估，沒測過的不顯示
 click('btn-standard');
-ok($('info-eval').textContent.includes('18 釐兵'),
-  '標準開局顯示實測先手優勢 18 釐兵（實際: ' + $('info-eval').textContent + '）');
+ok($('info-eval').textContent.includes('18 分'),
+  '標準開局顯示實測先手優勢 18 分（實際: ' + $('info-eval').textContent + '）');
 {
   let unmeasured = 0;
   while (window.balancedEval(unmeasured) !== null || !window.checkId(unmeasured).ok) unmeasured++;
