@@ -573,7 +573,7 @@ function randomSubsetId(sel) {
 // 50 分的量尺意義：Pikafish 的分數已正規化到勝率（不是材料值），實測這 351 局的
 // 紅方勝率平均 8.4%、最高 14.8%——與標準開局（18 分，也在池內）同一級距。
 // ⚠ 改動擺法規則或首著檢定後，這張表就失效，必須重跑引擎評估。
-// [原始編號, 紅方先手優勢（釐兵）]
+// [原始編號, 紅方先手優勢（分）]
 const BALANCED_CP = [
   [0, 36], [192, 36], [256, 37], [288, 41], [320, 44], [352, 26],
   [448, 29], [896, 41], [992, 38], [1056, 33], [1120, 40], [1152, 19],
@@ -643,7 +643,7 @@ function balancedCandidates() {
   return BALANCED_IDS.slice();
 }
 
-// 該編號的引擎實測評估（釐兵）；未入選平衡池者回 null
+// 該編號的引擎實測分數；未入選平衡池者回 null
 function balancedEval(id) {
   const v = BALANCED_CP_BY_ID.get(id);
   return v === undefined ? null : v;
