@@ -1,9 +1,9 @@
-// cc960 — 隨機開局擺位產生器（規格 v3）
+// cc960 — 隨機開局擺位產生器（規格 v4）
 //
 // 三條結構規則：
 //   一、紅黑「點對稱」：黑方 = 紅方旋轉 180°（紅 (r,c) ↔ 黑 (9-r, 8-c)）。
 //       從各自座位看，雙方陣形一模一樣（紅「一路」兵進 ↔ 黑「1路」卒進，不是同一 column）。
-//   二、象限定「原軌道」7 點（等同開局前已在己方領土走過合法步可達的點）。
+//   二、象限定「原軌道」5 點（底線與宮頂線；v4 收掉河沿，見 spec.md §1）。
 //   三、兵各路獨立，可原位或前進一格（每方 2^5 = 32 種兵形）。
 // 檢定（quietStartCheck）：任一首著吃子須「有根且不虧」或「對稱可回應」。
 //
@@ -14,10 +14,12 @@ if (typeof module !== 'undefined' && typeof RED === 'undefined') {
   Object.assign(globalThis, require('./rules.js'));
 }
 
-// 紅方象的原軌道 7 點 [row, col]：c1,g1（底線）、a3,e3,i3（宮頂線）、c5,g5（河沿）
-const E_POINTS = [[0, 2], [0, 6], [2, 0], [2, 4], [2, 8], [4, 2], [4, 6]];
+// 紅方象的原軌道 5 點 [row, col]：c1,g1（底線）、a3,e3,i3（宮頂線）
+// v4 拿掉河沿 c5,g5——河頭象實戰極罕見，且實測對平衡率毫無影響（spec.md §1）
+const E_POINTS = [[0, 2], [0, 6], [2, 0], [2, 4], [2, 8]];
 const E_PAIRS = [];
-for (let i = 0; i < 7; i++) for (let j = i + 1; j < 7; j++) E_PAIRS.push([i, j]);
+for (let i = 0; i < E_POINTS.length; i++)
+  for (let j = i + 1; j < E_POINTS.length; j++) E_PAIRS.push([i, j]);
 const BACK_ALL = [0, 1, 2, 6, 7, 8];   // 底線非九宮路 a,b,c,g,h,i
 const PAWN_FILES = [0, 2, 4, 6, 8];    // 兵的 5 路 a,c,e,g,i
 
@@ -34,7 +36,7 @@ const GROUPS = E_PAIRS.map(([i, j]) => {
 });
 const OFFSETS = [];
 { let acc = 0; for (const g of GROUPS) { OFFSETS.push(acc); acc += g.size; } }
-const RAW_TOTAL = OFFSETS[OFFSETS.length - 1] + GROUPS[GROUPS.length - 1].size;  // 1,389,312
+const RAW_TOTAL = OFFSETS[OFFSETS.length - 1] + GROUPS[GROUPS.length - 1].size;  // 525,312
 
 // 編號 → 擺位描述；越界回 null
 function decodeId(id) {
@@ -53,14 +55,13 @@ function decodeId(id) {
   return { ePts: g.pts, hFiles, rFiles, cFiles: C_PAIRS[cIdx], pMask };
 }
 
-// 編號 → 局面；結構衝突（炮或進兵疊上象位）回 null
+// 編號 → 局面；結構衝突（炮疊上宮頂線的象）回 null
+// v4 象不再上河沿，兵與象不可能撞位，故只剩炮這一種衝突
 function setupFromId(id) {
   const d = decodeId(id);
   if (!d) return null;
   const eKey = new Set(d.ePts.map(p => p[0] * 9 + p[1]));
   for (const f of d.cFiles) if (eKey.has(2 * 9 + f)) return null;           // 炮撞象（宮頂線）
-  for (let i = 0; i < 5; i++)
-    if ((d.pMask >> i) & 1 && eKey.has(4 * 9 + PAWN_FILES[i])) return null; // 進兵撞象（河沿）
   const bd = emptyBoard();
   for (const col of [RED, BLACK]) {
     // 點對稱：黑方 = 紅方旋轉 180°
@@ -139,6 +140,88 @@ function liteCandidates() {
   return out;
 }
 
+// ===== 勾選式產生器：逐棋種決定「隨機」或「固定在標準開局位置」 =====
+// sel = { e, n, r, c, p }，true 表示該棋種隨機擺放，false 表示釘在標準開局的位置：
+//   象 c1/g1、馬 b/h、車 a/i、炮 b/h、兵全原位。五個軸互相獨立，共 32 種組合。
+// 這五個位置在任何象位組下都取得到，因此每一種組合都必定含標準開局（編號 3872）。
+
+const SUBSET_STD = { hPair: [1, 7], rPair: [0, 8], cIdx: 13, pMask: 0 };
+const eqPair = (a, b) => a[0] === b[0] && a[1] === b[1];
+
+// 某個軸可取的索引；不隨機時只回標準開局那一個（找不到回空陣列）
+function axisIdxs(isFree, list, stdPair) {
+  if (isFree) return list.map((_, i) => i);
+  const i = list.findIndex(p => eqPair(p, stdPair));
+  return i < 0 ? [] : [i];
+}
+
+// 象位組 × 馬 × 車 的所有組合（最多數百筆）。炮與兵在其上各自展開，
+// 且每個三元組展開出的局面數都一樣，故「均勻抽三元組」＝「均勻抽局面」。
+function subsetTriples(sel) {
+  const out = [];
+  for (const gi of (sel.e ? GROUPS.map((_, i) => i) : [0])) {
+    const g = GROUPS[gi];
+    for (const hIdx of axisIdxs(sel.n, g.hPairs, SUBSET_STD.hPair)) {
+      const rPairs = pairs(g.backAvail.filter(f => !g.hPairs[hIdx].includes(f)));
+      for (const rIdx of axisIdxs(sel.r, rPairs, SUBSET_STD.rPair)) out.push([gi, hIdx, rIdx]);
+    }
+  }
+  return out;
+}
+
+// 三元組 → 該象位組宮頂線上的象所占的路（炮不可疊上去）
+const cannonBlocked = gi => GROUPS[gi].pts.filter(p => p[0] === 2).map(p => p[1]);
+
+// 某象位組下，炮還剩幾種擺法（扣掉疊上宮頂線象的組合）
+function cannonOptions(gi, free) {
+  const blocked = cannonBlocked(gi);
+  const out = [];
+  for (let cIdx = 0; cIdx < 36; cIdx++) {
+    if (!free && cIdx !== SUBSET_STD.cIdx) continue;
+    if (C_PAIRS[cIdx].some(f => blocked.includes(f))) continue;
+    out.push(cIdx);
+  }
+  return out;
+}
+
+// 候選筆數，不實際生成——決定「要不要全枚舉」時用，避免為了數數就配置幾十萬筆陣列
+function subsetCount(sel) {
+  let n = 0;
+  for (const [gi] of subsetTriples(sel)) n += cannonOptions(gi, sel.c).length * (sel.p ? 32 : 1);
+  return n;
+}
+
+// 勾選式候選編號。**在生成階段就跳過結構衝突**（不再「先生成再丟」），
+// 因此回傳的都擺得出來；是否通過首著靜置檢定仍由呼叫端用 checkId 過濾。
+function subsetCandidates(sel) {
+  const out = [];
+  for (const [gi, hIdx, rIdx] of subsetTriples(sel)) {
+    const base = OFFSETS[gi] + (hIdx * GROUPS[gi].rBase + rIdx) * 36 * 32;
+    for (const cIdx of cannonOptions(gi, sel.c)) {
+      for (let pMask = 0; pMask < 32; pMask++) {
+        if (!sel.p && pMask !== SUBSET_STD.pMask) continue;
+        out.push(base + cIdx * 32 + pMask);
+      }
+    }
+  }
+  return out;
+}
+
+// 即抽即驗：候選太多不值得全枚舉時用。同樣跳過結構衝突，只靠檢定重抽。
+function randomSubsetId(sel) {
+  const tri = subsetTriples(sel);
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  for (;;) {
+    const [gi, hIdx, rIdx] = pick(tri);
+    const blocked = cannonBlocked(gi);
+    const cIdx = sel.c ? Math.floor(Math.random() * 36) : SUBSET_STD.cIdx;
+    if (C_PAIRS[cIdx].some(f => blocked.includes(f))) continue;
+    const pMask = sel.p ? Math.floor(Math.random() * 32) : SUBSET_STD.pMask;
+    const id = OFFSETS[gi] + ((hIdx * GROUPS[gi].rBase + rIdx) * 36 + cIdx) * 32 + pMask;
+    if (checkId(id).ok) return id;
+  }
+}
+
 // ===== 衍生版本：平衡版（引擎驗證）=====
 // 輕量版 216 局全部餵給 Pikafish 2026-01-02（UCI，NNUE），固定 depth 40、單執行緒、
 // 置換表 1024 MB、MultiPV 1，逐局取紅方先手優勢；保留 |評估| ≤ 40 釐兵者共 70 局。
@@ -166,7 +249,7 @@ function balancedCandidates() {
 // 加一條限制：每方自身以中線（e 路）左右對稱；此時黑方「旋轉」與「翻面」結果相同，棋形如標準棋端正。
 // 象取對稱點對、馬車炮取對稱路對、兵進格 a=i、c=g、中兵獨立。檢定沿用同一套 quietStartCheck。
 
-const SYM_E_PAIRS = [[0, 1], [2, 4], [5, 6]];              // E_POINTS 索引：{c1,g1}{a3,i3}{c5,g5}
+const SYM_E_PAIRS = [[0, 1], [2, 4]];                      // E_POINTS 索引：{c1,g1}{a3,i3}（v4 起無 {c5,g5}）
 const SYM_BACK_PAIRS = [[0, 8], [1, 7], [2, 6]];           // 底線對稱路對 {a,i}{b,h}{c,g}
 const SYM_CANNON_PAIRS = [[0, 8], [1, 7], [2, 6], [3, 5]]; // 炮對稱路對 {a,i}{b,h}{c,g}{d,f}
 const SYM_PMASKS = [];                                      // 對稱兵形：bit 序 a,c,e,g,i
@@ -202,10 +285,31 @@ function symCandidates() {
   return out.sort((a, b) => a - b);
 }
 
+// ===== 局面的字串表示：象棋 FEN =====
+// 第一段自黑方底線（row 9）寫到紅方底線（row 0），每列 col 0→8（file a→i）；紅方大寫、黑方小寫。
+// 第 3/4 欄（吃過路兵、王車易位）象棋無意義但不可省；第 5 欄是 rule60 計數，≥120 會被 Pikafish 拒收。
+// 產出與公認 ground truth 逐字相符，且 Pikafish 2026-01-02 零拒收（見 spec.md §8）。
+function toFen(bd) {
+  const rows = [];
+  for (let r = 9; r >= 0; r--) {
+    let line = '', empty = 0;
+    for (let c = 0; c <= 8; c++) {
+      const p = bd[r][c];
+      if (!p) { empty++; continue; }
+      if (empty) { line += empty; empty = 0; }
+      line += p.c === RED ? p.t : p.t.toLowerCase();
+    }
+    if (empty) line += empty;
+    rows.push(line);
+  }
+  return rows.join('/') + ' w - - 0 1';
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     E_POINTS, E_PAIRS, BACK_ALL, PAWN_FILES, GROUPS, OFFSETS, RAW_TOTAL,
-    decodeId, setupFromId, legalCaptures, quietStartCheck, checkId,
+    decodeId, setupFromId, legalCaptures, quietStartCheck, checkId, toFen,
     STANDARD_ID, liteCandidates, symCandidates, balancedCandidates, BALANCED_IDS,
+    subsetTriples, subsetCount, subsetCandidates, randomSubsetId,
   };
 }

@@ -18,7 +18,7 @@ const inner = shell
 const splitAt = inner.indexOf('</style>') + '</style>'.length;
 const html = '<!DOCTYPE html>\n<html lang="zh-Hant">\n<head>\n<meta charset="UTF-8">\n'
   + '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-  + '<meta name="description" content="cc960：借鑑 Chess960 的隨機開局中國象棋，走法不變、只隨機開局擺放，合法開局 339,484 種。">\n'
+  + '<meta name="description" content="cc960：借鑑 Chess960 的隨機開局中國象棋，走法不變、只隨機開局擺放，合法開局 172,848 種。">\n'
   + inner.slice(0, splitAt) + '\n</head>\n<body>'
   + inner.slice(splitAt) + '\n</body>\n</html>\n';
 

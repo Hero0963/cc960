@@ -33,5 +33,5 @@ try {
   }
 } catch { /* roadmap 不在就跳過 */ }
 
-out.push('驗證：npm test（16 項）｜npm run count（約 20 秒，改規則必跑）｜規格正本 docs/spec.md');
+out.push('驗證：npm test（22 項）｜npm run count（約 10 秒，改規則必跑）｜規格正本 docs/spec.md');
 console.log(out.join('\n'));

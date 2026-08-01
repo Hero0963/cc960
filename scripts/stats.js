@@ -34,7 +34,7 @@ for (let id = 0; id < S.RAW_TOTAL; id++) {
 }
 console.log('合法 =', valid);
 console.log('含進兵 =', withAdvPawn, `(${(100 * withAdvPawn / valid).toFixed(1)}%)`, '兵全原位 =', pawnHome);
-console.log('含高位象(宮頂/河沿) =', withAloftE, `(${(100 * withAloftE / valid).toFixed(1)}%)`);
+console.log('含高位象(宮頂線) =', withAloftE, `(${(100 * withAloftE / valid).toFixed(1)}%)`);
 console.log('兩者兼具 =', bothFeatures);
 for (const [k, id] of Object.entries(samples)) {
   if (id == null) continue;

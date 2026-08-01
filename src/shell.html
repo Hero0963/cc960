@@ -1,4 +1,4 @@
-<title>cc960 — 隨機開局象棋</title>
+<title>cc960 隨機開局生成器</title>
 <style>
   :root {
     --paper: #faf6ee;        /* 暖紙色底 */
@@ -17,7 +17,6 @@
     --panel-border: #d9cbb2;
     --good: #2c6e49;
     --warn: #a63c06;
-    --hint: rgba(53, 80, 122, .55);
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -28,7 +27,6 @@
       --accent: #8fb0dd; --accent-soft: #26344a;
       --panel: #201810; --panel-border: #3d3020;
       --good: #7cc29a; --warn: #f0946a;
-      --hint: rgba(143, 176, 221, .6);
     }
   }
   :root[data-theme="dark"] {
@@ -39,7 +37,6 @@
     --accent: #8fb0dd; --accent-soft: #26344a;
     --panel: #201810; --panel-border: #3d3020;
     --good: #7cc29a; --warn: #f0946a;
-    --hint: rgba(143, 176, 221, .6);
   }
   :root[data-theme="light"] {
     --paper: #faf6ee; --ink: #2b2118; --ink-muted: #7a6a58;
@@ -49,7 +46,6 @@
     --accent: #35507a; --accent-soft: #dfe7f2;
     --panel: #f2ebdd; --panel-border: #d9cbb2;
     --good: #2c6e49; --warn: #a63c06;
-    --hint: rgba(53, 80, 122, .55);
   }
   body { background: var(--paper); color: var(--ink);
          font-family: "Segoe UI", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
@@ -72,46 +68,41 @@
   .panel h2 { font-size: .8rem; letter-spacing: .18em; text-transform: uppercase;
               color: var(--ink-muted); margin: 0 0 10px; font-weight: 600; }
   .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .controls + .controls { margin-top: 8px; }
   button { font: inherit; font-size: .92rem; padding: 7px 14px; border-radius: 6px;
            border: 1px solid var(--panel-border); background: var(--paper); color: var(--ink);
            cursor: pointer; }
   button:hover { border-color: var(--accent); }
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   button.primary { background: var(--accent); border-color: var(--accent); color: var(--paper); font-weight: 600; }
-  button:disabled { opacity: .45; cursor: default; }
-  select, input[type="number"] { font: inherit; font-size: .92rem; padding: 6px 8px;
-    border-radius: 6px; border: 1px solid var(--panel-border); background: var(--paper); color: var(--ink); }
-  input[type="number"] { width: 120px; font-variant-numeric: tabular-nums; }
-  .posinfo { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .92rem; margin-top: 10px;
-             font-variant-numeric: tabular-nums; }
-  .posinfo b { color: var(--accent); }
-  .gen-note { font-size: .85rem; color: var(--warn); min-height: 1.4em; margin-top: 4px; }
-  .status { font-size: 1.02rem; min-height: 1.6em; }
-  .status .turn-red { color: var(--red); font-weight: 700; }
-  .status .turn-black { font-weight: 700; }
-  .status .check { color: var(--warn); font-weight: 700; margin-left: 8px; }
-  .status .over { color: var(--good); font-weight: 700; }
-  .movelist { max-height: 300px; overflow-y: auto; font-size: .88rem;
-              font-variant-numeric: tabular-nums; }
-  .movelist ol { margin: 0; padding-left: 2em; }
-  .movelist li { padding: 1px 0; }
-  .movelist .red-mv { color: var(--red); }
-  details { font-size: .9rem; }
-  details summary { cursor: pointer; font-weight: 600; }
-  details ul { padding-left: 1.3em; margin: 8px 0; }
-  details li { margin: 4px 0; }
+  input[type="number"] { font: inherit; font-size: .92rem; padding: 6px 8px;
+    border-radius: 6px; border: 1px solid var(--panel-border); background: var(--paper); color: var(--ink);
+    width: 120px; font-variant-numeric: tabular-nums; }
+  .pieces { font-size: .92rem; }
+  .pieces .lead { color: var(--ink-muted); }
+  .pieces label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+                  padding: 3px 8px 3px 5px; border: 1px solid var(--panel-border);
+                  border-radius: 6px; background: var(--paper); }
+  .pieces label:hover { border-color: var(--accent); }
+  .pieces input { accent-color: var(--accent); margin: 0; }
+  .posinfo { font-size: .92rem; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+  .posinfo b { color: var(--accent); font-size: 1.05rem; }
+  .gen-note { font-size: .85rem; color: var(--ink-muted); min-height: 1.4em; margin-top: 4px; }
+  .gen-note.warn { color: var(--warn); }
+  .fen { font-family: "Cascadia Mono", "Consolas", "DejaVu Sans Mono", monospace;
+         font-size: .82rem; word-break: break-all; background: var(--paper);
+         border: 1px solid var(--panel-border); border-radius: 6px; padding: 8px 10px;
+         margin-bottom: 8px; user-select: all; }
+  .copy-note { font-size: .85rem; color: var(--good); min-height: 1.4em; margin-top: 4px; }
   .muted { color: var(--ink-muted); }
   footer { margin-top: 28px; color: var(--ink-muted); font-size: .85rem;
            border-top: 1px solid var(--panel-border); padding-top: 10px; }
-  @media (prefers-reduced-motion: no-preference) {
-    .piece { transition: transform .15s ease; }
-  }
 </style>
 
 <div class="wrap">
   <header>
-    <h1>cc960 <span class="num">隨機開局象棋</span></h1>
-    <span class="tagline">借鑑 Chess960 的中國象棋：走法完全不變，只隨機開局擺放 — 合法開局 <b>339,484</b> 種（規格 v3・紅黑點對稱）</span>
+    <h1>cc960 <span class="num">隨機開局生成器</span></h1>
+    <span class="tagline">借鑑 Chess960 的中國象棋：走法完全不變，只隨機開局擺放</span>
   </header>
 
   <div class="layout">
@@ -122,66 +113,45 @@
     <div class="side-col">
       <div class="panel">
         <h2>開局產生器</h2>
+        <div class="controls pieces">
+          <span class="lead">隨機哪些棋種：</span>
+          <label><input type="checkbox" id="ck-e" checked> 象</label>
+          <label><input type="checkbox" id="ck-n" checked> 馬</label>
+          <label><input type="checkbox" id="ck-r" checked> 車</label>
+          <label><input type="checkbox" id="ck-c" checked> 炮</label>
+          <label><input type="checkbox" id="ck-p" checked> 兵</label>
+        </div>
+        <div class="gen-note" id="pool-note"></div>
         <div class="controls">
-          <select id="mode" aria-label="版本">
-            <option value="full">完整版（合法開局 339,484 種）</option>
-            <option value="balanced">平衡版（70 局・引擎驗證過的平衡開局）</option>
-            <option value="sym">軸對稱版（146 局・每方自身左右對稱）</option>
-            <option value="lite">輕量版（216 局・象兵固定，只隨機車馬炮）</option>
-          </select>
           <button class="primary" id="btn-random">🎲 隨機一局</button>
           <button id="btn-standard">標準開局</button>
         </div>
-        <div class="controls" style="margin-top:8px">
-          <label for="posid">編號</label>
+        <div class="controls">
+          <label for="posid">跳至編號</label>
           <input type="number" id="posid" min="0" value="0">
           <button id="btn-goto">跳轉</button>
-        </div>
-        <div class="posinfo">
-          <span id="info-id-wrap">編號 <b id="info-id">–</b></span>
-          <span>紅方首著機動力 <b id="info-mob">–</b></span>
         </div>
         <div class="gen-note" id="gen-note"></div>
       </div>
 
       <div class="panel">
-        <h2>對局</h2>
-        <div class="status" id="status"></div>
-        <div class="controls" style="margin:8px 0">
-          <button id="btn-undo">悔棋</button>
-          <button id="btn-reset">重下此局</button>
+        <h2>這一局</h2>
+        <div class="posinfo">編號 <b id="info-id">–</b></div>
+        <div class="fen" id="fen">–</div>
+        <div class="controls">
+          <button id="btn-copy-fen">複製 FEN</button>
+          <button id="btn-copy-link">複製連結</button>
         </div>
-        <div class="movelist" id="movelist"><ol id="moves"></ol></div>
-      </div>
-
-      <div class="panel">
-        <details>
-          <summary>規則（規格 v3・紅黑點對稱）</summary>
-          <ul>
-            <li><b>走法與勝負完全同標準象棋</b>，只有初始擺放不同。</li>
-            <li><b>紅黑點對稱</b>（旋轉 180°）：黑方擺法＝紅方轉半圈——紅「一路」兵前進，對應黑「1路」卒前進（各自從自己座位數），<b>從各自座位看，雙方陣形一模一樣</b>。</li>
-            <li>將帥居中路九宮底、雙士貼於兩側（中路自對稱，且必有兵卒相隔，永不照面）。</li>
-            <li><b>象 2 子</b>隨機置於「原軌道」7 點中任 2 點（底線 c/g、宮頂線 a/e/i、河沿 c/g）——如同開局前已在己方領土走過合法步；空出的底線位留空。</li>
-            <li><b>馬 2 子、車 2 子</b>隨機分配剩餘的底線非九宮路；<b>炮 2 子</b>隨機置於宮頂線任 2 路（不可疊上象）。</li>
-            <li><b>兵 5 子</b>各路獨立：原位或前進一格（不可疊上河沿象）。</li>
-            <li>「首著靜置檢定」剔除失衡開局：任一首著吃子須<b>有根且不虧</b>，或<b>對稱可回應</b>（吃完後對方仍能走點對稱的對應著吃回同型子），否則局面不合法。</li>
-            <li>編號空間 1,389,312，其中合法 <b>339,484</b> 種（含標準開局＝編號 3872）。輕量版＝象、兵固定只隨機車馬炮，<b>216 局全數合法</b>（標準開局＝其 #122）。</li>
-            <li><b>軸對稱版</b>（衍生版本）：加一條限制——每方自身以中線左右對稱（此時黑方旋轉與翻面結果相同，棋形如標準棋端正），合法開局 <b>146</b> 局（標準開局＝其 #21）。</li>
-            <li><b>平衡版</b>（<b>70 局・引擎驗證</b>）：把輕量版 216 局全部交給象棋引擎評估，只留下先手優勢夠小的 70 局。<br>
-              <span class="muted"><b>驗證手法</b>：引擎 <b>Pikafish 2026-01-02</b>（UCI／NNUE），固定 <b>深度 40</b>、單執行緒、置換表 1024 MB、MultiPV 1，逐局取紅方先手優勢，保留 <b>|評估| ≤ 40 釐兵</b> 者，驗證日期 2026-07-25。<br>
-              量尺說明：現代引擎的評估已正規化到勝率，<b>100 釐兵 ≈ 50% 勝率</b>，故 40 釐兵約當紅方勝率一成上下——與標準開局（18 釐兵，也在本池內）同一級距。<br>
-              未入選者多半是開局就能強襲的局面，最極端者達 485 釐兵（紅方勝率近 100%）。完整分布與方法見 <a href="https://github.com/Hero0963/cc960/blob/main/docs/spec.md">docs/spec.md §8</a>。<br>
-              這 70 局都<b>公平且有多種可行下法</b>——引擎的最佳著與第三選擇平均只差 10 釐兵，代表沒有「唯一解」，留給棋手的選擇空間大。</span></li>
-            <li class="muted">本演示未實作長打（長將、長捉）禁著判例；棋規判例依中國象棋競賽規則。</li>
-          </ul>
-        </details>
+        <div class="copy-note" id="copy-note"></div>
+        <p class="muted" style="font-size:.85rem;margin:8px 0 0">
+          FEN 是象棋界通用的局面字串，可直接貼進象棋軟體或引擎。連結會帶上編號，對方打開就是同一局。
+        </p>
       </div>
     </div>
   </div>
 
   <footer>
-    cc960 · 隨機開局象棋（規格 v3）· 走法引擎與局面檢定皆於本頁即時計算，無後端、無外部函式庫 ·
-    原始碼與完整規格：<a href="https://github.com/Hero0963/cc960">github.com/Hero0963/cc960</a> · MIT License
+    <a href="https://github.com/Hero0963/cc960">github.com/Hero0963/cc960</a> · MIT License
   </footer>
 </div>
 

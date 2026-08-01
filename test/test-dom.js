@@ -1,120 +1,133 @@
-// cc960 — 演示頁無頭迴歸測試（16 項）
+// cc960 — 生成器頁無頭迴歸測試（25 項）
 // 用法：npm test（需先 npm install 取得 jsdom，且先 npm run build 產生 docs/index.html）
 // 測的是「建置後的成品」而非原始碼，因此組裝流程壞掉也會被抓到。
+// 走法引擎本身的迴歸保護在 `npm run count`（合法局面數等期望值一變就代表引擎壞了）。
 const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'docs', 'index.html'), 'utf8');
-const dom = new JSDOM(html, { runScripts: 'dangerously', pretendToBeVisual: true });
+const BASE = 'https://example.org/cc960/';
+const dom = new JSDOM(html, { url: BASE, runScripts: 'dangerously', pretendToBeVisual: true });
 const { window } = dom;
 const doc = window.document;
 const $ = id => doc.getElementById(id);
 
 let fails = 0;
 const ok = (cond, msg) => { console.log((cond ? 'PASS' : 'FAIL') + ' — ' + msg); if (!cond) fails++; };
-
-// 1) 載入後：標準開局（編號 3872）、32 子
-ok($('info-id-wrap').textContent.includes('3872'), '開場為標準開局編號 3872（實際: ' + $('info-id-wrap').textContent + '）');
-ok($('info-mob').textContent === '44 著', '標準局面機動力 44 著（實際: ' + $('info-mob').textContent + '）');
-ok(doc.querySelectorAll('#board g.piece text').length === 32, '棋盤上有 32 枚棋子');
-
-// 2) 模擬點擊走子：炮 b3 → e3（中炮），再吃中卒
-const svg = $('board');
-svg.getBoundingClientRect = () => ({ left: 0, top: 0, width: 500, height: 554 });
-const click = (c, r) => {
-  const x = 34 + c * 54, y = 34 + (9 - r) * 54;
-  svg.dispatchEvent(new window.MouseEvent('click', { clientX: x, clientY: y, bubbles: true }));
+const click = id => $(id).dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+const setCk = (axes) => {
+  for (const a of ['e', 'n', 'r', 'c', 'p']) {
+    $('ck-' + a).checked = axes.includes(a);
+    $('ck-' + a).dispatchEvent(new window.Event('change', { bubbles: true }));
+  }
 };
-click(1, 2); click(4, 2);
-ok($('moves').textContent.includes('炮b3–e3'), '走子 炮b3–e3');
-click(7, 7); click(4, 7);
-click(4, 2); click(4, 6);
-ok($('moves').textContent.includes('炮e3×e7卒'), '紅炮吃中卒記譜含 ×');
-$('btn-undo').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-ok(doc.querySelectorAll('#moves li').length === 2, '悔棋後剩 2 著');
+const curId = () => parseInt($('info-id').textContent, 10);
 
-// 3) 點對稱驗證：隨機一局後，黑(9-r,8-c) 應與 紅(r,c) 同型異色
-$('btn-random').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-ok(doc.querySelectorAll('#moves li').length === 0, '隨機一局後棋譜清空');
+const STD_FEN = 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w - - 0 1';
+
+// 1) 開場：標準開局、32 子、FEN 逐字正確
+ok($('info-id').textContent === '3872', '開場為標準開局編號 3872（實際: ' + $('info-id').textContent + '）');
+ok(doc.querySelectorAll('#board g.piece text').length === 32, '棋盤上有 32 枚棋子');
+ok($('fen').textContent === STD_FEN, '標準開局 FEN 逐字正確（實際: ' + $('fen').textContent + '）');
+
+// 2) 對局功能與規則區確實移除（不是藏起來）
 {
-  const id = parseInt($('info-id-wrap').textContent.match(/\d+/)[0], 10);
-  const bd = window.setupFromId(id);
-  let bad = 0;
-  for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) {
-    const p = bd[r][c], q = bd[9 - r][8 - c];
-    if ((p === null) !== (q === null)) { bad++; continue; }
-    if (p && (p.t !== q.t || p.c === q.c)) bad++;
+  const gone = ['status', 'moves', 'movelist', 'btn-undo', 'btn-reset', 'mode', 'info-mob'];
+  const left = gone.filter(id => $(id) !== null);
+  ok(left.length === 0, '對局介面與版本選單已移除（殘留: ' + (left.join(',') || '無') + '）');
+  ok(doc.querySelector('details') === null, '規則摺疊區已移除');
+}
+
+// 3) 全勾（預設）：即抽即驗、抽出來的都是完整 32 子的合法局面、點對稱成立
+ok($('pool-note').textContent.includes('即抽即驗'), '全勾時標示即抽即驗（實際: ' + $('pool-note').textContent + '）');
+{
+  let allOk = true, symOk = true;
+  for (let i = 0; i < 5; i++) {
+    click('btn-random');
+    if (doc.querySelectorAll('#board g.piece text').length !== 32) allOk = false;
+    if (!window.checkId(curId()).ok) allOk = false;
+    const bd = window.setupFromId(curId());
+    for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) {
+      const p = bd[r][c], q = bd[9 - r][8 - c];
+      if ((p === null) !== (q === null)) { symOk = false; continue; }
+      if (p && (p.t !== q.t || p.c === q.c)) symOk = false;
+    }
   }
-  ok(bad === 0, '隨機局面點對稱成立（編號 ' + id + '，違反格數 ' + bad + '）');
+  ok(allOk, '連抽 5 局皆為 32 子且通過檢定');
+  ok(symOk, '隨機局面紅黑點對稱成立');
+  ok(/^([a-zA-Z0-9]+\/){9}[a-zA-Z0-9]+ w - - 0 1$/.test($('fen').textContent),
+    'FEN 隨局面更新且格式正確（實際: ' + $('fen').textContent + '）');
 }
 
-// 4) 跳轉到不合法編號 → 自動跳至最近合法編號並提示
-let badId = 0;
-while (window.checkId(badId).ok) badId++;
-$('posid').value = String(badId);
-$('btn-goto').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-const note = $('gen-note').textContent;
-ok(note.includes('不合法') && note.includes('已跳至'), '不合法編號自動跳轉並提示（badId=' + badId + '，實際: ' + note + '）');
-
-// 5) 輕量版：216 局全合法、標準開局 = #122
-$('mode').value = 'lite';
-$('mode').dispatchEvent(new window.Event('change', { bubbles: true }));
-ok($('info-id-wrap').textContent.includes('／216'), '輕量版共 216 局面（實際: ' + $('info-id-wrap').textContent + '）');
-$('btn-standard').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-ok($('info-id-wrap').textContent.includes('#122／216'), '標準開局＝輕量版 #122（實際: ' + $('info-id-wrap').textContent + '）');
-$('posid').value = '1';
-$('btn-goto').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-ok($('info-id-wrap').textContent.includes('#1／216'), '跳轉至輕量版 #1');
-
-// 6) 軸對稱版：146 局、標準開局 = #21、抽一局驗證自身左右對稱
-$('mode').value = 'sym';
-$('mode').dispatchEvent(new window.Event('change', { bubbles: true }));
-ok($('info-id-wrap').textContent.includes('／146'), '軸對稱版共 146 局面（實際: ' + $('info-id-wrap').textContent + '）');
-$('btn-standard').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-ok($('info-id-wrap').textContent.includes('#21／146'), '標準開局＝軸對稱版 #21（實際: ' + $('info-id-wrap').textContent + '）');
-$('btn-random').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+// 4) 跳轉：輸入吃原始編號；不合法時往後找最近的合法編號並說明原因
 {
-  const id = parseInt($('info-id-wrap').textContent.match(/編號 (\d+)/)[1], 10);
-  const bd = window.setupFromId(id);
-  let bad = 0;
-  for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) {
-    const p = bd[r][c], ax = bd[r][8 - c];
-    if ((p === null) !== (ax === null)) { bad++; continue; }
-    if (p && (p.t !== ax.t || p.c !== ax.c)) bad++;
-  }
-  ok(bad === 0, '軸對稱版隨機局面自身左右對稱（編號 ' + id + '，違反格數 ' + bad + '）');
-}
-
-// 6.5) 平衡版：70 局（引擎驗證過的名單）、標準開局在池內、全數通過靜置檢定
-$('mode').value = 'balanced';
-$('mode').dispatchEvent(new window.Event('change', { bubbles: true }));
-ok($('info-id-wrap').textContent.includes('／70'), '平衡版共 70 局面（實際: ' + $('info-id-wrap').textContent + '）');
-$('btn-standard').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-ok($('info-id-wrap').textContent.includes('／70') && $('info-id-wrap').textContent.includes('編號 3872'),
-  '標準開局在平衡版池內（實際: ' + $('info-id-wrap').textContent + '）');
-{
-  // 名單是實測結果，硬編在 setup.js；至少要保證每一局都仍然合法且是輕量版的子集
-  const lite = new Set(window.liteCandidates());
-  const bad = window.balancedCandidates().filter(id => !window.checkId(id).ok || !lite.has(id));
-  ok(bad.length === 0, '平衡版 70 局全數合法且屬輕量版子集（違反 ' + bad.length + ' 局）');
-}
-{
-  // 名單是實測結果，介面必須主動說明驗證手法（引擎、深度、閾值），不能只留在摺疊的規則區
+  let badId = 0;
+  while (window.checkId(badId).ok) badId++;
+  $('posid').value = String(badId);
+  click('btn-goto');
   const note = $('gen-note').textContent;
-  ok(note.includes('Pikafish') && note.includes('40'),
-    '平衡版會顯示驗證手法（實際開頭: ' + note.slice(0, 28) + '…）');
+  ok(note.includes('不合法') && note.includes('已跳至'), '不合法編號自動跳轉並提示（badId=' + badId + '，實際: ' + note + '）');
+  click('btn-standard');
+  ok(curId() === 3872, '「標準開局」回到 3872');
 }
 
-// 7) 切回完整版、連抽 5 局皆完整
-$('mode').value = 'full';
-$('mode').dispatchEvent(new window.Event('change', { bubbles: true }));
-let allOk = true;
-for (let i = 0; i < 5; i++) {
-  $('btn-random').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-  if (doc.querySelectorAll('#board g.piece text').length !== 32) allOk = false;
+// 5) 勾選式產生器：各組合的局數，以及「不勾＝釘在標準開局位置」
+setCk(['n', 'r', 'c']);
+ok($('pool-note').textContent.includes('共 216 局'), '只隨機馬車炮 ＝ 216 局（實際: ' + $('pool-note').textContent + '）');
+{
+  const lite = new Set(window.liteCandidates().filter(id => window.checkId(id).ok));
+  let inPool = true;
+  for (let i = 0; i < 20; i++) { click('btn-random'); if (!lite.has(curId())) inPool = false; }
+  ok(inPool, '只隨機馬車炮時，連抽 20 局都落在輕量版 216 內');
 }
-ok(allOk, '連抽 5 局皆為完整 32 子局面');
+
+setCk([]);
+ok($('pool-note').textContent.includes('共 1 局'), '全不勾 ＝ 只剩標準開局 1 局（實際: ' + $('pool-note').textContent + '）');
+{
+  let always = true;
+  for (let i = 0; i < 3; i++) { click('btn-random'); if (curId() !== 3872) always = false; }
+  ok(always, '全不勾時隨機必定抽到 3872');
+}
+
+setCk(['p']);
+ok($('pool-note').textContent.includes('共 16 局'), '只隨機兵 ＝ 16 局（中兵一進就被白吃，32 種兵形只存活一半）');
+
+// 5.5) 退化的勾選要標出來：象釘 c1/g1、車釘 a/i 時，底線只剩 b/h 給馬
+setCk(['n']);
+ok($('pool-note').textContent.includes('馬（此設定下無可選位置）') && $('pool-note').textContent.includes('共 1 局'),
+  '只勾馬時標示無可選位置（實際: ' + $('pool-note').textContent + '）');
+setCk(['n', 'r']);
+ok(!$('pool-note').textContent.includes('無可選位置') && $('pool-note').textContent.includes('共 6 局'),
+  '馬車同時勾就有 6 種變化，不該標無可選位置（實際: ' + $('pool-note').textContent + '）');
+setCk(['e', 'n', 'r', 'c', 'p']);
+ok(!$('pool-note').textContent.includes('無可選位置'), '全勾時不標無可選位置');
+
+setCk(['e', 'n', 'r', 'c']);
+ok($('pool-note').textContent.includes('共 10803 局'), '不隨機兵（象馬車炮）＝ 10,803 局，對上 spec.md §5 的兵全原位子集');
+
+// 6) 分享：網址同步、複製按鈕有回饋
+setCk(['e', 'n', 'r', 'c', 'p']);
+click('btn-standard');
+ok(window.location.search === '?id=3872', '網址同步為 ?id=3872（實際: ' + window.location.search + '）');
+{
+  $('posid').value = '0';
+  click('btn-goto');
+  ok(window.location.search === '?id=' + curId(), '跳轉後網址跟著更新（實際: ' + window.location.search + '）');
+  click('btn-copy-fen');
+  ok($('copy-note').textContent.length > 0, '按「複製 FEN」有回饋訊息（實際: ' + $('copy-note').textContent + '）');
+}
+
+// 7) 帶 ?id= 開頁會載入該局
+{
+  let target = 0;
+  while (!window.checkId(target).ok || target === 3872) target++;
+  const dom2 = new JSDOM(html, { url: BASE + '?id=' + target, runScripts: 'dangerously', pretendToBeVisual: true });
+  const got = dom2.window.document.getElementById('info-id').textContent;
+  ok(got === String(target), '網址 ?id=' + target + ' 開頁即載入該局（實際: ' + got + '）');
+  ok(dom2.window.document.querySelectorAll('#board g.piece text').length === 32, '?id= 載入的局面同樣是 32 子');
+  dom2.window.close();
+}
 
 console.log(fails === 0 ? '\n全部通過 ✔' : '\n有 ' + fails + ' 項失敗 ✘');
 process.exit(fails ? 1 : 0);

@@ -1,5 +1,6 @@
-// cc960 — 演示頁互動層（棋盤 SVG 繪製、走子、三池切換）
+// cc960 — 生成器頁的互動層（棋盤 SVG 繪製、勾選式產生器、FEN 與連結分享）
 // 只依賴 rules.js 與 setup.js 的全域函式；無任何外部函式庫。
+// 本頁只產生開局，不提供行棋——走法引擎仍在，供局面檢定與 FEN 使用。
 (function () {
   'use strict';
 
@@ -13,7 +14,7 @@
   ];
   const PIECE_FONT = '"DFKai-SB","BiauKai","Kaiti TC","KaiTi","Noto Serif TC",serif';
   const REASON = {
-    structural: '結構衝突（炮或進兵疊上象位）',
+    structural: '結構衝突（炮疊上宮頂線的象）',
     'free-capture': '首著可白吃且對稱不可回應',
     'winning-capture': '首著可低值吃高值',
     facing: '開局照面', check: '開局被將',
@@ -22,26 +23,28 @@
   const $ = id => document.getElementById(id);
   const svg = $('board');
 
-  // 輕量版／軸對稱版：候選少，載入時全枚舉並給密集編號；完整版採「即抽即驗」
-  const LISTS = {
-    lite: liteCandidates().filter(id => checkId(id).ok),
-    sym: symCandidates().filter(id => checkId(id).ok),
-    balanced: balancedCandidates().filter(id => checkId(id).ok),
-  };
-  const MODE_LABEL = { lite: '輕量版', sym: '軸對稱版', balanced: '平衡版' };
-  // 平衡版的名單是實測結果，不是算出來的——切到該池時直接說明驗證手法，不要藏在摺疊區裡
-  const MODE_NOTE = {
-    balanced: '本池 70 局由 Pikafish 2026-01-02（NNUE）於固定深度 40、單執行緒逐局評估，'
-      + '保留紅方先手優勢 ≤ 40 釐兵者（100 釐兵 ≈ 50% 勝率；標準開局為 18 釐兵，也在池內）。'
-      + '這些局面公平，且最佳著與第三選擇平均只差 10 釐兵——沒有唯一解，下法選擇多。',
-  };
-  const curList = () => LISTS[S.mode] || null;
+  // --- 勾選式產生器 ---
+  const AXES = ['e', 'n', 'r', 'c', 'p'];
+  const AXIS_LABEL = { e: '象', n: '馬', r: '車', c: '炮', p: '兵' };
+  const FIXED_AT = { e: 'c1/g1', n: 'b/h', r: 'a/i', c: 'b/h', p: '全原位' };
+  // 候選超過此數就不全枚舉、改即抽即驗：實測 4 萬多筆的枚舉＋檢定約 0.7 秒，全勾的 35 萬筆約 10 秒
+  const ENUM_LIMIT = 60000;
 
-  const S = {
-    mode: 'full', id: STANDARD_ID,
-    bd: null, turn: RED, sel: null, dests: [],
-    hist: [], last: null, over: null,
-  };
+  const S = { id: STANDARD_ID, sel: null };
+  const poolCache = {};                       // 勾選組合 → 合法編號清單（null ＝ 該組合不枚舉）
+
+  const readSel = () => AXES.reduce((s, a) => (s[a] = $('ck-' + a).checked, s), {});
+  const selKey = sel => AXES.map(a => sel[a] ? '1' : '0').join('');
+
+  function poolFor(sel) {
+    const key = selKey(sel);
+    if (!(key in poolCache)) {
+      poolCache[key] = subsetCount(sel) > ENUM_LIMIT
+        ? null
+        : subsetCandidates(sel).filter(id => checkId(id).ok);
+    }
+    return poolCache[key];
+  }
 
   function el(name, attrs, text) {
     const n = document.createElementNS(NS, name);
@@ -84,166 +87,113 @@
 
   // --- 全盤重繪 ---
   function render() {
+    const bd = setupFromId(S.id);
     svg.textContent = '';
     const g = el('g', {});
     drawStatic(g);
-
-    if (S.last) {
-      const [fr, fc, tr, tc] = S.last;
-      g.appendChild(el('circle', { cx: X(fc), cy: Y(fr), r: 6, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2, opacity: .6 }));
-      g.appendChild(el('circle', { cx: X(tc), cy: Y(tr), r: 27, fill: 'none', stroke: 'var(--accent)', 'stroke-width': 2, opacity: .6 }));
-    }
-
-    const checked = !S.over && inCheck(S.bd, S.turn) ? findKing(S.bd, S.turn) : null;
     for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) {
-      const p = S.bd[r][c];
+      const p = bd[r][c];
       if (!p) continue;
-      const sel = S.sel && S.sel[0] === r && S.sel[1] === c;
-      const pg = el('g', { class: 'piece', style: 'cursor:pointer' });
-      pg.appendChild(el('circle', { cx: X(c), cy: Y(r), r: 23, fill: 'var(--piece-face)', stroke: sel ? 'var(--accent)' : 'var(--piece-rim)', 'stroke-width': sel ? 3 : 1.5 }));
+      const pg = el('g', { class: 'piece' });
+      pg.appendChild(el('circle', { cx: X(c), cy: Y(r), r: 23, fill: 'var(--piece-face)', stroke: 'var(--piece-rim)', 'stroke-width': 1.5 }));
       const tone = p.c === RED ? 'var(--red)' : 'var(--black-piece)';
       pg.appendChild(el('circle', { cx: X(c), cy: Y(r), r: 19.5, fill: 'none', stroke: tone, 'stroke-width': 1, opacity: .75 }));
       pg.appendChild(el('text', {
         x: X(c), y: Y(r), 'text-anchor': 'middle', 'dominant-baseline': 'central',
         'font-size': 26, 'font-family': PIECE_FONT, 'font-weight': 700, fill: tone,
       }, PIECE_CH[p.c][p.t]));
-      if (checked && p.t === 'K' && p.c === S.turn) {
-        pg.appendChild(el('circle', { cx: X(c), cy: Y(r), r: 26, fill: 'none', stroke: 'var(--warn)', 'stroke-width': 3 }));
-      }
       g.appendChild(pg);
     }
-
-    for (const [rr, cc] of S.dests) {
-      if (S.bd[rr][cc]) g.appendChild(el('circle', { cx: X(cc), cy: Y(rr), r: 27, fill: 'none', stroke: 'var(--hint)', 'stroke-width': 3.5 }));
-      else g.appendChild(el('circle', { cx: X(cc), cy: Y(rr), r: 7.5, fill: 'var(--hint)' }));
-    }
     svg.appendChild(g);
-    renderPanel();
+    $('info-id').textContent = S.id;
+    $('fen').textContent = toFen(bd);
   }
 
-  function renderPanel() {
-    const list = curList();
-    if (list) {
-      $('info-id-wrap').innerHTML = MODE_LABEL[S.mode] + ' <b>#' + (list.indexOf(S.id) + 1) + '／' + list.length + '</b>（編號 ' + S.id + '）';
-      $('posid').min = 1; $('posid').max = list.length;
-    } else {
-      $('info-id-wrap').innerHTML = '編號 <b>' + S.id + '</b>';
-      $('posid').min = 0; $('posid').max = RAW_TOTAL - 1;
-    }
-    $('info-mob').textContent = legalMoves(setupFromId(S.id), RED).length + ' 著';
-    $('btn-undo').disabled = S.hist.length === 0;
-    const st = $('status');
-    if (S.over) {
-      st.innerHTML = '<span class="over">' + S.over + '</span>';
-    } else {
-      st.innerHTML = (S.turn === RED ? '<span class="turn-red">● 紅方走子</span>' : '<span class="turn-black">● 黑方走子</span>')
-        + (inCheck(S.bd, S.turn) ? '<span class="check">將軍！</span>' : '');
-    }
+  function renderPoolNote() {
+    const list = poolFor(S.sel);
+    const on = AXES.filter(a => S.sel[a]), off = AXES.filter(a => !S.sel[a]);
+    // 勾了卻完全不影響結果的軸要標出來，否則使用者勾了看不出差別會以為壞掉。
+    // 例：象釘 c1/g1、車釘 a/i 時，底線只剩 b/h 給馬——勾「馬」也沒得選。
+    const total = subsetCount(S.sel);
+    const isDead = a => subsetCount(Object.assign({}, S.sel, { [a]: false })) === total;
+    let t = on.length
+      ? '隨機：' + on.map(a => AXIS_LABEL[a] + (isDead(a) ? '（此設定下無可選位置）' : '')).join('、')
+      : '五種棋子全部固定';
+    if (off.length) t += '｜固定：' + off.map(a => AXIS_LABEL[a] + ' ' + FIXED_AT[a]).join('、');
+    $('pool-note').textContent = t + (list ? '　→ 此組合共 ' + list.length + ' 局' : '　→ 局面太多，隨機時即抽即驗');
   }
 
   // --- 局面載入 ---
   function loadId(id, note) {
     S.id = id;
-    S.bd = setupFromId(id);
-    S.turn = RED; S.sel = null; S.dests = []; S.hist = []; S.last = null; S.over = null;
-    $('moves').textContent = '';
-    const list = curList();
-    $('posid').value = list ? list.indexOf(id) + 1 : id;
-    $('gen-note').textContent = note || MODE_NOTE[S.mode] || '';
+    $('posid').value = id;
+    $('gen-note').textContent = note || '';
+    $('gen-note').className = note ? 'gen-note warn' : 'gen-note';
+    $('copy-note').textContent = '';
+    // file:// 下瀏覽器會擋 replaceState（來源為 null），失敗就算了，不影響其他功能
+    try { history.replaceState(null, '', location.pathname + '?id=' + id); } catch (e) { /* 忽略 */ }
     render();
   }
 
-  // --- 行棋 ---
-  function notation(bd, r, c, rr, cc) {
-    const p = bd[r][c], v = bd[rr][cc];
-    return PIECE_CH[p.c][p.t] + FILES[c] + (r + 1) + (v ? '×' : '–') + FILES[cc] + (rr + 1) + (v ? PIECE_CH[v.c][v.t] : '');
+  // --- 分享 ---
+  const shareLink = () => location.href.split('#')[0].split('?')[0] + '?id=' + S.id;
+
+  function copyText(text, label) {
+    const say = ok => { $('copy-note').textContent = ok ? label + '已複製' : '無法自動複製，請手動選取'; };
+    const fallback = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      say(ok);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => say(true), fallback);
+    } else fallback();
   }
-
-  function doMove(r, c, rr, cc) {
-    S.hist.push({ bd: S.bd, turn: S.turn, last: S.last, over: S.over });
-    const li = document.createElement('li');
-    li.textContent = notation(S.bd, r, c, rr, cc);
-    if (S.turn === RED) li.className = 'red-mv';
-    $('moves').appendChild(li);
-    $('movelist').scrollTop = 1e6;
-    S.bd = makeMove(S.bd, r, c, rr, cc);
-    S.last = [r, c, rr, cc];
-    S.turn = 1 - S.turn;
-    S.sel = null; S.dests = [];
-    if (legalMoves(S.bd, S.turn).length === 0) {
-      const how = inCheck(S.bd, S.turn) ? '將死' : '困斃';
-      S.over = how + '，' + (S.turn === RED ? '黑方勝' : '紅方勝');
-    }
-    render();
-  }
-
-  svg.addEventListener('click', ev => {
-    if (S.over) return;
-    const rect = svg.getBoundingClientRect();
-    const sx = 500 / rect.width;
-    const px = (ev.clientX - rect.left) * sx, py = (ev.clientY - rect.top) * sx;
-    const c = Math.round((px - MARGIN) / CELL), rInv = Math.round((py - MARGIN) / CELL);
-    const r = 9 - rInv;
-    if (c < 0 || c > 8 || r < 0 || r > 9) return;
-    if (Math.abs(px - X(c)) > CELL / 2 - 2 || Math.abs(py - Y(r)) > CELL / 2 - 2) return;
-
-    if (S.sel && S.dests.some(d => d[0] === r && d[1] === c)) {
-      doMove(S.sel[0], S.sel[1], r, c);
-      return;
-    }
-    const p = S.bd[r][c];
-    if (p && p.c === S.turn) {
-      S.sel = [r, c];
-      S.dests = legalMoves(S.bd, S.turn).filter(m => m[0] === r && m[1] === c).map(m => [m[2], m[3]]);
-    } else {
-      S.sel = null; S.dests = [];
-    }
-    render();
-  });
 
   // --- 控制列 ---
   $('btn-random').addEventListener('click', () => {
-    const list = curList();
-    if (list) { loadId(list[Math.floor(Math.random() * list.length)]); return; }
-    let id;                                 // 即抽即驗（接受率約 24%，均攤數次，毫秒級）
-    do { id = Math.floor(Math.random() * RAW_TOTAL); } while (!checkId(id).ok);
-    loadId(id);
+    const list = poolFor(S.sel);
+    loadId(list ? list[Math.floor(Math.random() * list.length)] : randomSubsetId(S.sel));
   });
   $('btn-standard').addEventListener('click', () => loadId(STANDARD_ID));
+
   function gotoInput() {
     const n = parseInt($('posid').value, 10);
-    const list = curList();
-    if (list) {
-      const k = Math.max(1, Math.min(list.length, n || 1));
-      loadId(list[k - 1]);
-      return;
-    }
-    let id = Math.max(0, Math.min(RAW_TOTAL - 1, isNaN(n) ? 0 : n));
+    const id = Math.max(0, Math.min(RAW_TOTAL - 1, isNaN(n) ? 0 : n));
     const res = checkId(id);
     if (res.ok) { loadId(id); return; }
-    let next = id;                          // 往後找最近的合法編號（循環）
+    let next = id;                            // 往後找最近的合法編號（循環）
     do { next = (next + 1) % RAW_TOTAL; } while (!checkId(next).ok);
     loadId(next, '編號 ' + id + ' 不合法（' + (REASON[res.why] || res.why) + '），已跳至最近的合法編號 ' + next);
   }
   $('btn-goto').addEventListener('click', gotoInput);
   $('posid').addEventListener('keydown', ev => { if (ev.key === 'Enter') gotoInput(); });
-  $('btn-reset').addEventListener('click', () => loadId(S.id));
-  $('btn-undo').addEventListener('click', () => {
-    const h = S.hist.pop();
-    if (!h) return;
-    S.bd = h.bd; S.turn = h.turn; S.last = h.last; S.over = h.over;
-    S.sel = null; S.dests = [];
-    const ml = $('moves');
-    if (ml.lastChild) ml.removeChild(ml.lastChild);
-    render();
-  });
-  $('mode').addEventListener('change', ev => {
-    S.mode = ev.target.value;
-    const list = curList();
-    if (list && !list.includes(S.id)) loadId(STANDARD_ID);
-    else loadId(S.id);
-  });
 
-  // 開場：標準開局（讓「跟標準只差在哪」一目瞭然，再讓使用者自己抽）
-  loadId(STANDARD_ID);
+  $('btn-copy-fen').addEventListener('click', () => copyText($('fen').textContent, 'FEN '));
+  $('btn-copy-link').addEventListener('click', () => copyText(shareLink(), '連結'));
+
+  for (const a of AXES) {
+    $('ck-' + a).addEventListener('change', () => { S.sel = readSel(); renderPoolNote(); });
+  }
+
+  // --- 開場 ---
+  // 網址帶 ?id= 就載入該局（方便分享），否則用標準開局，讓「跟標準只差在哪」一目瞭然
+  function initialId() {
+    const m = /[?&]id=(\d+)/.exec(location.search || '');
+    if (!m) return STANDARD_ID;
+    const id = Number(m[1]);
+    return (id < RAW_TOTAL && checkId(id).ok) ? id : STANDARD_ID;
+  }
+  $('posid').max = RAW_TOTAL - 1;
+  S.sel = readSel();
+  renderPoolNote();
+  loadId(initialId());
 })();
