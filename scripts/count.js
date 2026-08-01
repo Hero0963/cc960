@@ -46,8 +46,8 @@ console.log('[結果] 淘汰統計 =', JSON.stringify(stats));
 console.log('[結果] 兵全原位子集合法 =', pawnFixedValid, '/', S.RAW_TOTAL / 32, '(預期 10803 / 16416)');
 console.log('[結果] 輕量版(216 候選)合法 =', liteValid, '(預期 216)');
 console.log('[結果] 軸對稱版合法 =', S.symCandidates().filter(id => S.checkId(id).ok).length, '(預期 100)');
-// 平衡版是引擎實測名單（spec.md §8），規則一改就要確認它們仍全數合法
-console.log('[結果] 平衡版合法 =', S.balancedCandidates().filter(id => S.checkId(id).ok).length, '(預期 70)');
+// 平衡池是引擎實測名單（spec.md §8.3），規則一改就要確認它們仍全數合法
+console.log('[結果] 引擎驗證平衡池合法 =', S.balancedCandidates().filter(id => S.checkId(id).ok).length, '(預期 280)');
 console.log('[結果] 耗時 =', ((Date.now() - t0) / 1000).toFixed(1), 's');
 
 // ---- 3) 抽樣機動力統計 ----

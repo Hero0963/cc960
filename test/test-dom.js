@@ -1,4 +1,4 @@
-// cc960 — 生成器頁無頭迴歸測試（25 項）
+// cc960 — 生成器頁無頭迴歸測試（32 項）
 // 用法：npm test（需先 npm install 取得 jsdom，且先 npm run build 產生 docs/index.html）
 // 測的是「建置後的成品」而非原始碼，因此組裝流程壞掉也會被抓到。
 // 走法引擎本身的迴歸保護在 `npm run count`（合法局面數等期望值一變就代表引擎壞了）。
@@ -105,6 +105,44 @@ ok(!$('pool-note').textContent.includes('無可選位置'), '全勾時不標無�
 
 setCk(['e', 'n', 'r', 'c']);
 ok($('pool-note').textContent.includes('共 10803 局'), '不隨機兵（象馬車炮）＝ 10,803 局，對上 spec.md §5 的兵全原位子集');
+
+// 5.8) 只給引擎驗證過的平衡盤面
+setCk(['e', 'n', 'r', 'c', 'p']);
+{
+  $('ck-balanced').checked = true;
+  $('ck-balanced').dispatchEvent(new window.Event('change', { bubbles: true }));
+  ok($('pool-note').textContent.includes('引擎驗證平衡 280 局'),
+    '全勾＋平衡篩選 ＝ 280 局（實際: ' + $('pool-note').textContent + '）');
+  const bal = new Set(window.balancedCandidates());
+  let allIn = true, allMeasured = true;
+  for (let i = 0; i < 20; i++) {
+    click('btn-random');
+    if (!bal.has(curId())) allIn = false;
+    if (Math.abs(window.balancedEval(curId())) > 40) allMeasured = false;
+  }
+  ok(allIn, '平衡篩選下連抽 20 局都在 280 局名單內');
+  ok(allMeasured, '抽到的每一局實測評估都 ≤ 40 釐兵');
+  // 與棋種勾選取交集：只隨機馬車炮時應退回原本那 70 局
+  setCk(['n', 'r', 'c']);
+  ok($('pool-note').textContent.includes('引擎驗證平衡 70 局'),
+    '平衡篩選 ∩ 只隨機馬車炮 ＝ 70 局（實際: ' + $('pool-note').textContent + '）');
+  setCk(['e', 'n', 'r', 'c', 'p']);
+  $('ck-balanced').checked = false;
+  $('ck-balanced').dispatchEvent(new window.Event('change', { bubbles: true }));
+  ok($('pool-note').textContent.includes('即抽即驗'), '取消平衡篩選後回到即抽即驗');
+}
+
+// 5.9) 有實測值的局面要顯示引擎評估，沒測過的不顯示
+click('btn-standard');
+ok($('info-eval').textContent.includes('18 釐兵'),
+  '標準開局顯示實測先手優勢 18 釐兵（實際: ' + $('info-eval').textContent + '）');
+{
+  let unmeasured = 0;
+  while (window.balancedEval(unmeasured) !== null || !window.checkId(unmeasured).ok) unmeasured++;
+  $('posid').value = String(unmeasured);
+  click('btn-goto');
+  ok($('info-eval').textContent === '', '未實測過的局面不顯示評估（編號 ' + unmeasured + '）');
+}
 
 // 6) 分享：網址同步、複製按鈕有回饋
 setCk(['e', 'n', 'r', 'c', 'p']);

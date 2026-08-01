@@ -85,6 +85,8 @@
                   border-radius: 6px; background: var(--paper); }
   .pieces label:hover { border-color: var(--accent); }
   .pieces input { accent-color: var(--accent); margin: 0; }
+  .pieces label.wide { font-weight: 600; }
+  .eval { color: var(--good); font-weight: 600; }
   .posinfo { font-size: .92rem; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
   .posinfo b { color: var(--accent); font-size: 1.05rem; }
   .gen-note { font-size: .85rem; color: var(--ink-muted); min-height: 1.4em; margin-top: 4px; }
@@ -121,6 +123,9 @@
           <label><input type="checkbox" id="ck-c" checked> 炮</label>
           <label><input type="checkbox" id="ck-p" checked> 兵</label>
         </div>
+        <div class="controls pieces">
+          <label class="wide"><input type="checkbox" id="ck-balanced"> 只給引擎驗證過的平衡盤面</label>
+        </div>
         <div class="gen-note" id="pool-note"></div>
         <div class="controls">
           <button class="primary" id="btn-random">🎲 隨機一局</button>
@@ -136,7 +141,7 @@
 
       <div class="panel">
         <h2>這一局</h2>
-        <div class="posinfo">編號 <b id="info-id">–</b></div>
+        <div class="posinfo">編號 <b id="info-id">–</b> <span id="info-eval"></span></div>
         <div class="fen" id="fen">–</div>
         <div class="controls">
           <button id="btn-copy-fen">複製 FEN</button>
@@ -144,7 +149,9 @@
         </div>
         <div class="copy-note" id="copy-note"></div>
         <p class="muted" style="font-size:.85rem;margin:8px 0 0">
-          FEN 是象棋界通用的局面字串，可直接貼進象棋軟體或引擎。連結會帶上編號，對方打開就是同一局。
+          FEN 是象棋界通用的局面字串，可直接貼進象棋軟體或引擎。連結會帶上編號，對方打開就是同一局。<br>
+          「引擎實測先手優勢」只有那 280 局驗證過的盤面才會顯示：Pikafish 2026-01-02 固定深度 40 的評估值，
+          100 釐兵約當五成勝率，所以 40 釐兵以內大致等於「紅方勝率一成上下」，與標準開局（18 釐兵）同級。
         </p>
       </div>
     </div>

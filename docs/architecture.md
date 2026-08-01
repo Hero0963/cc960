@@ -79,7 +79,7 @@
 | 核心函式 | 說明 |
 |---------|------|
 | `decodeId(id)` | 編號 → `{ ePts, hFiles, rFiles, cFiles, pMask }`；越界回 `null` |
-| `setupFromId(id)` | 編號 → 棋盤；**結構衝突（炮或進兵疊上象位）回 `null`** |
+| `setupFromId(id)` | 編號 → 棋盤；**結構衝突（炮疊上宮頂線的象）回 `null`** |
 
 **(2) 首著靜置檢定**
 
@@ -96,7 +96,7 @@
 | `STANDARD_ID` | `(3 * 36 + 13) * 32` = **3872**，標準開局 |
 | `liteCandidates()` | 輕量版候選（象固定 c1/g1、兵全原位）**216 個** |
 | `symCandidates()` | 軸對稱版候選（每方自身左右對稱）；靠 `SYM_E_PAIRS` / `SYM_BACK_PAIRS` / `SYM_CANNON_PAIRS` / `SYM_PMASKS` 四張對稱表產生 |
-| `balancedCandidates()` / `BALANCED_IDS` | 平衡版 70 局。**這張表是引擎實測結果、不是算出來的**——改動擺法規則或檢定後必須重新評估（見 [spec.md §8](spec.md)） |
+| `balancedCandidates()` / `BALANCED_IDS` / `balancedEval(id)` | 引擎驗證平衡池 **280 局**，資料在 `BALANCED_CP`（`[編號, 釐兵]` 對）。**這張表是引擎實測結果、不是算出來的**——改動擺法規則或檢定後必須重新評估（見 [spec.md §8.3](spec.md)） |
 
 ⚠ 兩個 `Candidates()` 回的是**候選編號，尚未過檢定**，呼叫端要自行 `filter(id => checkId(id).ok)`。
 
@@ -123,6 +123,8 @@
 | `drawStatic(g)` | 畫棋盤：格線、河界、九宮斜線、砲兵位的十字標記 |
 | `render()` | 依 `S.id` 重繪棋子，並更新 `#info-id` 與 `#fen` |
 | `poolFor(sel)` | 勾選組合 → 合法編號清單；候選 > `ENUM_LIMIT`（60,000）回 `null` 表示改即抽即驗。結果以 `poolCache` 依組合鍵快取 |
+| `balancedPoolFor(sel)` | 平衡池 280 局 ∩ 目前棋種勾選（全勾時 280、只勾馬車炮時 70）；同樣走 `poolCache`，鍵前綴 `B` |
+| `curPool()` | 依「只給平衡盤面」勾選決定用哪個池 |
 | `renderPoolNote()` | 描述目前勾選（隨機哪些、固定哪些、共幾局）。用 `subsetCount` 比對「把某軸改成固定後筆數變不變」，把**勾了卻無可選位置**的軸標出來 |
 | `loadId(id, note)` | 載入一個編號、同步網址 `?id=`、更新 FEN |
 | `gotoInput()` | 讀 `#posid` 跳轉；**不合法時自動往後找最近的合法編號並說明原因** |
@@ -131,7 +133,7 @@
 **版面常數**：`CELL = 54`、`MARGIN = 34`；座標轉換 `X(c) = MARGIN + c*CELL`、`Y(r) = MARGIN + (9-r)*CELL`
 （**注意 Y 是反的**：`row 0` 是紅方底線，畫在畫面下方。）
 
-**狀態**：單一物件 `S`（`id` ＝ 目前編號、`sel` ＝ 目前勾選）。盤面不存在 `S` 裡，每次由 `setupFromId(S.id)` 現算。
+**狀態**：單一物件 `S`（`id` ＝ 目前編號、`sel` ＝ 棋種勾選、`onlyBalanced` ＝ 是否只給平衡盤面）。盤面不存在 `S` 裡，每次由 `setupFromId(S.id)` 現算。
 **網址同步**：`history.replaceState` 包在 `try/catch` 裡——`file://` 開啟時瀏覽器會擋（來源為 null），失敗就只是不同步，不影響其他功能。
 
 ### 2.4 `src/shell.html`（166 行）— 產生器頁外殼
@@ -142,7 +144,7 @@ HTML 結構、CSS、所有對外文案。**三個注入點**是純註解，`buil
 /*__RULES__*/    /*__SETUP__*/    /*__UI__*/
 ```
 
-主要元素：`#board`（SVG）、`#ck-e`/`#ck-n`/`#ck-r`/`#ck-c`/`#ck-p`（五個勾選）、`#btn-random` / `#btn-standard` / `#btn-goto`、`#posid`（編號輸入）、`#info-id` / `#fen` / `#pool-note` / `#gen-note` / `#copy-note`、`#btn-copy-fen` / `#btn-copy-link`。
+主要元素：`#board`（SVG）、`#ck-e`/`#ck-n`/`#ck-r`/`#ck-c`/`#ck-p`（五個棋種勾選）、`#ck-balanced`（只給平衡盤面）、`#btn-random` / `#btn-standard` / `#btn-goto`、`#posid`（編號輸入）、`#info-id` / `#info-eval` / `#fen` / `#pool-note` / `#gen-note` / `#copy-note`、`#btn-copy-fen` / `#btn-copy-link`。
 
 **改產生器頁的外觀或文案改這裡，不是 `docs/index.html`。**
 
@@ -155,9 +157,9 @@ HTML 結構、CSS、所有對外文案。**三個注入點**是純註解，`buil
 | `scripts/build.js`（26 行） | 把 shell ＋ 三個 js **內聯**成單檔 `docs/index.html`：讀 shell → 換三個注入點 → 在 `</style>` 處切開 → 補 doctype/head/body | `npm run build` |
 | `scripts/count.js`（64 行） | **全空間枚舉**：點對稱抽驗、標準局驗證、52 萬編號逐一 `checkId`、淘汰分解、機動力抽樣 | `npm run count`（約 10 秒） |
 | `scripts/stats.js`（44 行） | 特徵統計（進兵比例、高位象比例）＋ 用中文字在終端機渲染示範局面 | `npm run stats` |
-| `test/test-dom.js` | **22 項無頭 DOM 迴歸測試** | `npm test` |
+| `test/test-dom.js` | **32 項無頭 DOM 迴歸測試** | `npm test` |
 
-> **走法引擎的迴歸保護在 `npm run count`**：合法局面數（172,848）、輕量版 216、軸對稱版 100、平衡版 70、標準局 44 著這些期望值，只要引擎行為被改壞就會立刻不對。
+> **走法引擎的迴歸保護在 `npm run count`**：合法局面數（172,848）、輕量版 216、軸對稱版 100、平衡池 280、標準局 44 著這些期望值，只要引擎行為被改壞就會立刻不對。
 > 頁面移除行棋功能後不再有走子／吃子的 DOM 測試，但引擎並未失去保護。
 
 ### `test-dom.js` 的關鍵設計
@@ -211,7 +213,7 @@ const dom = new JSDOM(html, { url: BASE, runScripts: 'dangerously', pretendToBeV
 | 標準開局在合法池內、編號 3872、紅方 44 著 | `npm run count` 前三行 |
 | 走法引擎行為（蹩腿、塞眼、照面、隔子吃、過河橫走） | `npm run count`：引擎一被改壞，172,848／216／100／70／44 這些期望值立刻不對 |
 | 32 種勾選組合每一種都含標準開局 | `npm test` |
-| `BALANCED_IDS` 是引擎實測名單 | 改擺法規則或檢定後**必須重跑引擎評估**；`npm run count` 只驗它們仍合法 |
+| `BALANCED_CP` 是引擎實測名單 | 改擺法規則或檢定後**必須重跑引擎評估**；`npm run count` 只驗它們仍合法 |
 | `makeMove()` 不 mutate 傳入盤面 | 沿用慣例；改動時特別小心 |
 | `docs/index.html` 是建置產物 | **永遠不要手改**，只能由 `npm run build` 產生 |
 | 產生器頁單檔、零相依、可離線 | GitHub Pages 直接吃 `docs/index.html`；不引入框架或 bundler |

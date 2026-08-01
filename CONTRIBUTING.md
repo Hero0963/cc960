@@ -11,7 +11,7 @@
 git clone https://github.com/Hero0963/cc960.git
 cd cc960
 npm install
-npm test          # build ＋ 22 項無頭 DOM 測試
+npm test          # build ＋ 32 項無頭 DOM 測試
 ```
 
 ## 指令
@@ -19,7 +19,7 @@ npm test          # build ＋ 22 項無頭 DOM 測試
 | 指令 | 用途 | 耗時 |
 |------|------|------|
 | `npm run build` | `src/` → `docs/index.html`（單檔產生器頁） | 即時 |
-| `npm test` | build ＋ 22 項 jsdom 迴歸測試 | 數秒 |
+| `npm test` | build ＋ 32 項 jsdom 迴歸測試 | 數秒 |
 | `npm run count` | 全空間枚舉：合法局面數、淘汰分解、機動力抽樣 | 約 10 秒 |
 | `npm run stats` | 特徵統計＋終端機渲染示範局面 | 約 10 秒 |
 

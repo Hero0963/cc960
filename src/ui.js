@@ -30,7 +30,7 @@
   // 候選超過此數就不全枚舉、改即抽即驗：實測 4 萬多筆的枚舉＋檢定約 0.7 秒，全勾的 35 萬筆約 10 秒
   const ENUM_LIMIT = 60000;
 
-  const S = { id: STANDARD_ID, sel: null };
+  const S = { id: STANDARD_ID, sel: null, onlyBalanced: false };
   const poolCache = {};                       // 勾選組合 → 合法編號清單（null ＝ 該組合不枚舉）
 
   const readSel = () => AXES.reduce((s, a) => (s[a] = $('ck-' + a).checked, s), {});
@@ -45,6 +45,18 @@
     }
     return poolCache[key];
   }
+
+  // 只給平衡盤面時，池就是那 280 局與目前棋種勾選的交集（全勾時即全部 280 局）
+  function balancedPoolFor(sel) {
+    const key = 'B' + selKey(sel);
+    if (!(key in poolCache)) {
+      const inSel = new Set(subsetCandidates(sel));
+      poolCache[key] = balancedCandidates().filter(id => inSel.has(id));
+    }
+    return poolCache[key];
+  }
+
+  const curPool = () => S.onlyBalanced ? balancedPoolFor(S.sel) : poolFor(S.sel);
 
   function el(name, attrs, text) {
     const n = document.createElementNS(NS, name);
@@ -107,10 +119,12 @@
     svg.appendChild(g);
     $('info-id').textContent = S.id;
     $('fen').textContent = toFen(bd);
+    const cp = balancedEval(S.id);
+    $('info-eval').textContent = cp === null ? '' : '· 引擎實測先手優勢 ' + cp + ' 釐兵';
+    $('info-eval').className = cp === null ? '' : 'eval';
   }
 
   function renderPoolNote() {
-    const list = poolFor(S.sel);
     const on = AXES.filter(a => S.sel[a]), off = AXES.filter(a => !S.sel[a]);
     // 勾了卻完全不影響結果的軸要標出來，否則使用者勾了看不出差別會以為壞掉。
     // 例：象釘 c1/g1、車釘 a/i 時，底線只剩 b/h 給馬——勾「馬」也沒得選。
@@ -120,7 +134,13 @@
       ? '隨機：' + on.map(a => AXIS_LABEL[a] + (isDead(a) ? '（此設定下無可選位置）' : '')).join('、')
       : '五種棋子全部固定';
     if (off.length) t += '｜固定：' + off.map(a => AXIS_LABEL[a] + ' ' + FIXED_AT[a]).join('、');
-    $('pool-note').textContent = t + (list ? '　→ 此組合共 ' + list.length + ' 局' : '　→ 局面太多，隨機時即抽即驗');
+    if (S.onlyBalanced) {
+      t += '　→ 引擎驗證平衡 ' + balancedPoolFor(S.sel).length + ' 局';
+    } else {
+      const list = poolFor(S.sel);
+      t += list ? '　→ 此組合共 ' + list.length + ' 局' : '　→ 局面太多，隨機時即抽即驗';
+    }
+    $('pool-note').textContent = t;
   }
 
   // --- 局面載入 ---
@@ -160,7 +180,7 @@
 
   // --- 控制列 ---
   $('btn-random').addEventListener('click', () => {
-    const list = poolFor(S.sel);
+    const list = curPool();
     loadId(list ? list[Math.floor(Math.random() * list.length)] : randomSubsetId(S.sel));
   });
   $('btn-standard').addEventListener('click', () => loadId(STANDARD_ID));
@@ -183,6 +203,10 @@
   for (const a of AXES) {
     $('ck-' + a).addEventListener('change', () => { S.sel = readSel(); renderPoolNote(); });
   }
+  $('ck-balanced').addEventListener('change', ev => {
+    S.onlyBalanced = ev.target.checked;
+    renderPoolNote();
+  });
 
   // --- 開場 ---
   // 網址帶 ?id= 就載入該局（方便分享），否則用標準開局，讓「跟標準只差在哪」一目瞭然
@@ -194,6 +218,7 @@
   }
   $('posid').max = RAW_TOTAL - 1;
   S.sel = readSel();
+  S.onlyBalanced = $('ck-balanced').checked;
   renderPoolNote();
   loadId(initialId());
 })();

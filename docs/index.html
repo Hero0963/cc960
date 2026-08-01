@@ -91,6 +91,8 @@
                   border-radius: 6px; background: var(--paper); }
   .pieces label:hover { border-color: var(--accent); }
   .pieces input { accent-color: var(--accent); margin: 0; }
+  .pieces label.wide { font-weight: 600; }
+  .eval { color: var(--good); font-weight: 600; }
   .posinfo { font-size: .92rem; margin-bottom: 8px; font-variant-numeric: tabular-nums; }
   .posinfo b { color: var(--accent); font-size: 1.05rem; }
   .gen-note { font-size: .85rem; color: var(--ink-muted); min-height: 1.4em; margin-top: 4px; }
@@ -129,6 +131,9 @@
           <label><input type="checkbox" id="ck-c" checked> 炮</label>
           <label><input type="checkbox" id="ck-p" checked> 兵</label>
         </div>
+        <div class="controls pieces">
+          <label class="wide"><input type="checkbox" id="ck-balanced"> 只給引擎驗證過的平衡盤面</label>
+        </div>
         <div class="gen-note" id="pool-note"></div>
         <div class="controls">
           <button class="primary" id="btn-random">🎲 隨機一局</button>
@@ -144,7 +149,7 @@
 
       <div class="panel">
         <h2>這一局</h2>
-        <div class="posinfo">編號 <b id="info-id">–</b></div>
+        <div class="posinfo">編號 <b id="info-id">–</b> <span id="info-eval"></span></div>
         <div class="fen" id="fen">–</div>
         <div class="controls">
           <button id="btn-copy-fen">複製 FEN</button>
@@ -152,7 +157,9 @@
         </div>
         <div class="copy-note" id="copy-note"></div>
         <p class="muted" style="font-size:.85rem;margin:8px 0 0">
-          FEN 是象棋界通用的局面字串，可直接貼進象棋軟體或引擎。連結會帶上編號，對方打開就是同一局。
+          FEN 是象棋界通用的局面字串，可直接貼進象棋軟體或引擎。連結會帶上編號，對方打開就是同一局。<br>
+          「引擎實測先手優勢」只有那 280 局驗證過的盤面才會顯示：Pikafish 2026-01-02 固定深度 40 的評估值，
+          100 釐兵約當五成勝率，所以 40 釐兵以內大致等於「紅方勝率一成上下」，與標準開局（18 釐兵）同級。
         </p>
       </div>
     </div>
@@ -560,27 +567,76 @@ function randomSubsetId(sel) {
   }
 }
 
-// ===== 衍生版本：平衡版（引擎驗證）=====
-// 輕量版 216 局全部餵給 Pikafish 2026-01-02（UCI，NNUE），固定 depth 40、單執行緒、
-// 置換表 1024 MB、MultiPV 1，逐局取紅方先手優勢；保留 |評估| ≤ 40 釐兵者共 70 局。
-// 40 釐兵的量尺意義：Pikafish 的評估已正規化到勝率，100 釐兵 ≈ 50% 勝率，
-// 故 40 釐兵約當「紅方勝率 11% 上下」——與標準開局（18 釐兵）同一級距。
-// 驗證日期 2026-07-25；方法與完整分布見 docs/spec.md §8。
-// 此表是實測結果，不是算出來的：改動擺法規則或檢定後必須重新評估。
-const BALANCED_IDS = [
-  0, 192, 256, 352, 448, 992, 1056, 1120,
-  1152, 1216, 1344, 1408, 1440, 1536, 1600, 1728,
-  1760, 2208, 3488, 3520, 3552, 3584, 3616, 3648,
-  3680, 3712, 3744, 3776, 3808, 3840, 3872, 3904,
-  3936, 3968, 4000, 4032, 4064, 4096, 4128, 4160,
-  4192, 4224, 4256, 4288, 4320, 4352, 4384, 4416,
-  4448, 4480, 4512, 4544, 4800, 4864, 4992, 5056,
-  5184, 5216, 5344, 5568, 5600, 5664, 5728, 5952,
-  6016, 6048, 6080, 6208, 6528, 6816,
+// ===== 引擎驗證過的平衡開局（實測資料，不是算出來的）=====
+// 這 280 局是 Pikafish 2026-01-02（UCI，NNUE）在固定 depth 40、單執行緒、置換表 1024 MB、
+// MultiPV 1 下逐局實測，紅方先手優勢 |cp| <= 40 釐兵者。資料來自兩批批跑：
+//   2026-07-25「只隨機馬車炮」216 局全跑；2026-08-01 三十二種勾選組合各取樣 min(25, N) 局。
+// 兩批設定相同故可併表；共實測 617 局，其中 280 局入選。
+// 40 釐兵的量尺意義：Pikafish 的評估已正規化到勝率，100 釐兵約當五成勝率，
+// 故 40 釐兵約當「紅方勝率一成上下」——與標準開局（18 釐兵，也在池內）同一級距。
+// ⚠ 改動擺法規則或首著檢定後，這張表就失效，必須重跑引擎評估。
+// [原始編號, 紅方先手優勢（釐兵）]
+const BALANCED_CP = [
+  [0, 36], [192, 36], [256, 37], [352, 26], [448, 29], [992, 38],
+  [1056, 33], [1120, 40], [1152, 19], [1216, 40], [1344, 20], [1408, 18],
+  [1440, 15], [1536, 35], [1600, 12], [1728, 40], [1760, 36], [2208, 33],
+  [3488, 37], [3520, 28], [3552, 31], [3584, 19], [3616, 28], [3640, 30],
+  [3648, 26], [3680, 20], [3683, 24], [3712, 19], [3730, 39], [3744, 17],
+  [3776, 34], [3808, 32], [3824, 23], [3840, 28], [3872, 18], [3873, 19],
+  [3874, 16], [3875, 25], [3880, 19], [3881, 27], [3882, 28], [3883, 30],
+  [3888, 19], [3889, 14], [3890, 18], [3896, 32], [3898, 37], [3899, 35],
+  [3904, 28], [3936, 19], [3968, 26], [4000, 22], [4008, 36], [4032, 25],
+  [4051, 26], [4064, 26], [4096, 28], [4098, 18], [4128, 24], [4137, 33],
+  [4145, 15], [4160, 22], [4192, 21], [4224, 35], [4256, 25], [4288, 30],
+  [4320, 30], [4329, 25], [4352, 37], [4376, 39], [4384, 30], [4416, 16],
+  [4419, 26], [4448, 21], [4466, 16], [4480, 25], [4512, 23], [4513, 22],
+  [4544, 33], [4800, 17], [4864, 31], [4992, 34], [5056, 26], [5184, 36],
+  [5216, 39], [5344, 30], [5528, 40], [5568, 32], [5600, 17], [5664, 18],
+  [5728, 19], [5952, 23], [6016, 39], [6048, 25], [6080, 29], [6081, 38],
+  [6208, 39], [6528, 37], [6816, 39], [16544, 12], [16553, 28], [22304, 28],
+  [24448, 39], [24459, 39], [24608, 29], [24611, 31], [25760, 38], [25763, 31],
+  [25771, 26], [25777, 23], [25787, 35], [25888, 34], [26154, 40], [26912, 40],
+  [33088, 15], [33090, 20], [33888, 17], [33891, 24], [56864, 27], [56875, 37],
+  [57536, 24], [59168, 16], [59195, 37], [59904, 22], [60288, 16], [60312, 23],
+  [60320, 23], [60330, 31], [60344, 18], [60346, 34], [60704, 16], [60715, 28],
+  [67072, 26], [69376, 33], [87168, 35], [91424, 32], [93728, 37], [93739, 34],
+  [93824, 37], [93850, 30], [94883, 40], [94897, 20], [94898, 36], [94976, 29],
+  [95424, 23], [125984, 35], [125993, 32], [129450, 33], [129464, 35], [129465, 31],
+  [129728, 29], [129881, 33], [130602, 36], [131072, 34], [131096, 39], [136928, 40],
+  [158848, 35], [158849, 15], [160544, 23], [160553, 32], [163616, 32], [163624, 32],
+  [163632, 38], [163712, 21], [163738, 25], [164000, 21], [164003, 22], [164017, 14],
+  [164024, 20], [164026, 25], [164032, 30], [164035, 29], [164544, 14], [165088, 18],
+  [170944, 27], [170962, 33], [176544, 22], [176547, 22], [194432, 22], [194441, 27],
+  [195104, 28], [195112, 39], [195120, 16], [195456, 15], [195465, 40], [197408, 39],
+  [198320, 31], [198560, 40], [198569, 28], [198570, 27], [198584, 28], [198720, 19],
+  [198723, 33], [199136, 27], [199712, 24], [212288, 24], [240032, 9], [240034, 6],
+  [258464, 17], [258483, 24], [260000, 21], [260018, 34], [260768, 31], [260779, 24],
+  [263232, 33], [263235, 29], [264224, 26], [264249, 35], [265312, 29], [265330, 30],
+  [265376, 24], [265379, 24], [265393, 19], [265408, 32], [265424, 32], [265568, 23],
+  [265585, 20], [266080, 24], [266088, 24], [266528, 12], [266529, 15], [267168, 36],
+  [267680, 26], [267689, 16], [269184, 27], [269202, 32], [279200, 40], [279203, 20],
+  [285952, 33], [285955, 16], [286112, 19], [286130, 10], [300480, 32], [305696, 36],
+  [305697, 32], [308160, 35], [355232, 36], [355234, 40], [362144, 35], [362162, 32],
+  [362336, 40], [368065, 38], [369056, 37], [369066, 22], [369216, 31], [369243, 36],
+  [369696, 28], [369714, 36], [371937, 39], [389792, 31], [389809, 25], [428800, 35],
+  [428816, 37], [452992, 37], [453010, 37], [458912, 39], [458913, 29], [459200, 14],
+  [459225, 16], [465824, 16], [465840, 28], [470720, 8], [470736, 5], [471584, 22],
+  [471592, 18], [472736, 22], [472739, 20], [472745, 24], [472752, 19], [472753, 16],
+  [473888, 12], [473912, 13], [474784, 26], [474800, 15], [478496, 14], [478505, 6],
+  [493248, 21], [493256, 21], [493472, 18], [493488, 20],
 ];
+
+const BALANCED_IDS = BALANCED_CP.map(e => e[0]);
+const BALANCED_CP_BY_ID = new Map(BALANCED_CP);
 
 function balancedCandidates() {
   return BALANCED_IDS.slice();
+}
+
+// 該編號的引擎實測評估（釐兵）；未入選平衡池者回 null
+function balancedEval(id) {
+  const v = BALANCED_CP_BY_ID.get(id);
+  return v === undefined ? null : v;
 }
 
 // ===== 衍生版本：軸對稱版 =====
@@ -647,7 +703,7 @@ if (typeof module !== 'undefined') {
   module.exports = {
     E_POINTS, E_PAIRS, BACK_ALL, PAWN_FILES, GROUPS, OFFSETS, RAW_TOTAL,
     decodeId, setupFromId, legalCaptures, quietStartCheck, checkId, toFen,
-    STANDARD_ID, liteCandidates, symCandidates, balancedCandidates, BALANCED_IDS,
+    STANDARD_ID, liteCandidates, symCandidates, balancedCandidates, BALANCED_IDS, balancedEval,
     subsetTriples, subsetCount, subsetCandidates, randomSubsetId,
   };
 }
@@ -686,7 +742,7 @@ if (typeof module !== 'undefined') {
   // 候選超過此數就不全枚舉、改即抽即驗：實測 4 萬多筆的枚舉＋檢定約 0.7 秒，全勾的 35 萬筆約 10 秒
   const ENUM_LIMIT = 60000;
 
-  const S = { id: STANDARD_ID, sel: null };
+  const S = { id: STANDARD_ID, sel: null, onlyBalanced: false };
   const poolCache = {};                       // 勾選組合 → 合法編號清單（null ＝ 該組合不枚舉）
 
   const readSel = () => AXES.reduce((s, a) => (s[a] = $('ck-' + a).checked, s), {});
@@ -701,6 +757,18 @@ if (typeof module !== 'undefined') {
     }
     return poolCache[key];
   }
+
+  // 只給平衡盤面時，池就是那 280 局與目前棋種勾選的交集（全勾時即全部 280 局）
+  function balancedPoolFor(sel) {
+    const key = 'B' + selKey(sel);
+    if (!(key in poolCache)) {
+      const inSel = new Set(subsetCandidates(sel));
+      poolCache[key] = balancedCandidates().filter(id => inSel.has(id));
+    }
+    return poolCache[key];
+  }
+
+  const curPool = () => S.onlyBalanced ? balancedPoolFor(S.sel) : poolFor(S.sel);
 
   function el(name, attrs, text) {
     const n = document.createElementNS(NS, name);
@@ -763,10 +831,12 @@ if (typeof module !== 'undefined') {
     svg.appendChild(g);
     $('info-id').textContent = S.id;
     $('fen').textContent = toFen(bd);
+    const cp = balancedEval(S.id);
+    $('info-eval').textContent = cp === null ? '' : '· 引擎實測先手優勢 ' + cp + ' 釐兵';
+    $('info-eval').className = cp === null ? '' : 'eval';
   }
 
   function renderPoolNote() {
-    const list = poolFor(S.sel);
     const on = AXES.filter(a => S.sel[a]), off = AXES.filter(a => !S.sel[a]);
     // 勾了卻完全不影響結果的軸要標出來，否則使用者勾了看不出差別會以為壞掉。
     // 例：象釘 c1/g1、車釘 a/i 時，底線只剩 b/h 給馬——勾「馬」也沒得選。
@@ -776,7 +846,13 @@ if (typeof module !== 'undefined') {
       ? '隨機：' + on.map(a => AXIS_LABEL[a] + (isDead(a) ? '（此設定下無可選位置）' : '')).join('、')
       : '五種棋子全部固定';
     if (off.length) t += '｜固定：' + off.map(a => AXIS_LABEL[a] + ' ' + FIXED_AT[a]).join('、');
-    $('pool-note').textContent = t + (list ? '　→ 此組合共 ' + list.length + ' 局' : '　→ 局面太多，隨機時即抽即驗');
+    if (S.onlyBalanced) {
+      t += '　→ 引擎驗證平衡 ' + balancedPoolFor(S.sel).length + ' 局';
+    } else {
+      const list = poolFor(S.sel);
+      t += list ? '　→ 此組合共 ' + list.length + ' 局' : '　→ 局面太多，隨機時即抽即驗';
+    }
+    $('pool-note').textContent = t;
   }
 
   // --- 局面載入 ---
@@ -816,7 +892,7 @@ if (typeof module !== 'undefined') {
 
   // --- 控制列 ---
   $('btn-random').addEventListener('click', () => {
-    const list = poolFor(S.sel);
+    const list = curPool();
     loadId(list ? list[Math.floor(Math.random() * list.length)] : randomSubsetId(S.sel));
   });
   $('btn-standard').addEventListener('click', () => loadId(STANDARD_ID));
@@ -839,6 +915,10 @@ if (typeof module !== 'undefined') {
   for (const a of AXES) {
     $('ck-' + a).addEventListener('change', () => { S.sel = readSel(); renderPoolNote(); });
   }
+  $('ck-balanced').addEventListener('change', ev => {
+    S.onlyBalanced = ev.target.checked;
+    renderPoolNote();
+  });
 
   // --- 開場 ---
   // 網址帶 ?id= 就載入該局（方便分享），否則用標準開局，讓「跟標準只差在哪」一目瞭然
@@ -850,6 +930,7 @@ if (typeof module !== 'undefined') {
   }
   $('posid').max = RAW_TOTAL - 1;
   S.sel = readSel();
+  S.onlyBalanced = $('ck-balanced').checked;
   renderPoolNote();
   loadId(initialId());
 })();
